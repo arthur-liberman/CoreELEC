@@ -43,11 +43,12 @@ run_tee_from_coreelec() {
   fi
 
   mkdir -p /var/lib
-  ln -sfn /usr/lib/ta/${SOC} /var/lib/optee_armtz
+  ln -sfn /usr/lib/ta/${SOC} /var/lib/teetz
 
   [ -f $(dirname ${VIDEO_UCODE_BIN_PATH})/${SOC}/video_ucode.bin ] && \
     ln -sfn ${SOC}/video_ucode.bin ${VIDEO_UCODE_BIN_PATH}
 
+  modprobe -q optee_armtz
   tee-supplicant &
   echo ${!} >${TEE_SUPPLICANT_PID_FILE}
   # wait for tee-supplicant process to start
@@ -114,6 +115,7 @@ EOF
     return 1
   fi
 
+  modprobe -q optee_armtz
   android_wrapper exec /vendor/bin/tee-supplicant &
   echo ${!} >${TEE_SUPPLICANT_PID_FILE}
   # wait for tee-supplicant process to start
@@ -137,6 +139,8 @@ cleanup_tee() {
     rm -f ${TEE_SUPPLICANT_PID_FILE}
   fi
 
+  modprobe -r optee_armtz
+
   mountpoint -q /android/system && umount /android/system
   mountpoint -q /android/vendor && umount /android/vendor
   ls /dev/mapper/dynpart-* &>/dev/null && dmsetup remove /dev/mapper/dynpart-*
@@ -151,13 +155,12 @@ SERIAL_SC2=$(printf "%d" "0x32")
 if [ ${SERIAL_THIS} -lt ${SERIAL_SC2} ]; then
   echo 1 > $(realpath /sys/module/*tee/parameters/disable_flag)
   message "tee not needed (SoC is less than SC2 (0x32) architecture)"
-  ln -sfn NO_TEE/video_ucode.bin ${VIDEO_UCODE_BIN_PATH}
   exit 0
 fi
 
 case "${1}" in
   start)
-    if [ -b /dev/super ]; then
+    if [ "${COREELEC_DEVICE}" = "Amlogic-ne" -a -b /dev/super ]; then
       run_tee_from_android
       rv=${?}
       [ ${rv} -eq 0 ] && exit 0
@@ -172,8 +175,6 @@ case "${1}" in
 
     run_tee_from_coreelec
     [ ${?} -eq 0 ] && exit 0
-
-    if [ ! -b /dev/super ]; then exit 0; fi
 
     cat > /tmp/tee.message << 'EOF'
 [TITLE]CoreELEC Media Playback[/TITLE]
