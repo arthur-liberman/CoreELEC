@@ -1,17 +1,15 @@
-From 5265bbab52e6c42f4a6371a0eb25b9f92dbd159c Mon Sep 17 00:00:00 2001
-From: Portisch <hugo.portisch@yahoo.de>
-Date: Tue, 16 May 2023 10:20:38 +0200
+From 88bcea953c388d41c7501efc73d3ebeff468d41a Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Mon, 6 Jan 2025 02:40:14 +0200
 Subject: [PATCH 1/4] Revert "Linux: statx syscall number is always available"
 
 This reverts commit 7255ccbec997312033c9fe48e0971a2e7cb19fbf.
-
-Revert as this is not true for older kernels.
 ---
  sysdeps/unix/sysv/linux/statx.c | 11 +++++++----
  1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/sysdeps/unix/sysv/linux/statx.c b/sysdeps/unix/sysv/linux/statx.c
-index 5fdb4378d4..6ad99ad7a2 100644
+index a6295a155d..602fe048c9 100644
 --- a/sysdeps/unix/sysv/linux/statx.c
 +++ b/sysdeps/unix/sysv/linux/statx.c
 @@ -25,14 +25,17 @@ int
@@ -37,5 +35,5 @@ index 5fdb4378d4..6ad99ad7a2 100644
  #endif
  }
 -- 
-2.40.1
+2.47.1
 
