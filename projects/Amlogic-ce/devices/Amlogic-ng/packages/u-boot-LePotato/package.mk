@@ -11,6 +11,12 @@ PKG_DEPENDS_TARGET="toolchain gcc-linaro-aarch64-elf:host gcc-linaro-arm-eabi:ho
 PKG_LONGDESC="Das U-Boot is a cross-platform bootloader for embedded systems."
 PKG_TOOLCHAIN="manual"
 
+post_unpack() {
+  cp ${PKG_BUILD}/include/libfdt.h ${PKG_BUILD}/lib/libfdt/
+  cp ${PKG_BUILD}/include/libfdt_env.h ${PKG_BUILD}/lib/libfdt/
+  cp ${PKG_BUILD}/include/fdt.h ${PKG_BUILD}/lib/libfdt/
+}
+
 configure_package() {
   PKG_UBOOT_CONFIG="libretech_cc_defconfig"
 }

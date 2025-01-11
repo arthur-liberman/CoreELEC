@@ -39,7 +39,8 @@ post_makeinstall_host() {
       -e "s|'LDFLAGS'|'TARGET_LDFLAGS'|g" \
       -e "s|ldshared.startswith(cc)|True|g" \
       -e "s|ldshared\[len(cc):\]|''|g" \
-      -i ${TOOLCHAIN}/lib/gobject-introspection/giscanner/ccompiler.py
+      -i ${TOOLCHAIN}/lib/gobject-introspection/giscanner/ccompiler.py \
+      -i ${TOOLCHAIN}/lib/gobject-introspection/giscanner/dumper.py
 }
 
 pre_configure_target() {
@@ -62,7 +63,7 @@ pre_configure_target() {
   export GI_SCANNER_DISABLE_CACHE=1
 
   ${QEMU_BINARY} \
-    -E LD_LIBRARY_PATH="${SYSROOT_PREFIX}/usr/lib" \
+    -E LD_LIBRARY_PATH="${SYSROOT_PREFIX}/usr/lib:${TOOLCHAIN}/${TARGET_NAME}/lib" \
     -L ${SYSROOT_PREFIX}/usr \
     "\$@"
 EOF

@@ -1,0 +1,221 @@
+From 1d7f8db9611ccf70f1807d946a75d171d0fcc865 Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Fri, 3 Jan 2025 22:36:45 +0200
+Subject: [PATCH] Revert "lsfd: add BPF.NAME column"
+
+This reverts commit bc8083680c0e84cc980f90ce111c83324a8f645c.
+---
+ misc-utils/lsfd-unkn.c | 78 ------------------------------------------
+ misc-utils/lsfd.c      |  3 --
+ misc-utils/lsfd.h      |  1 -
+ 3 files changed, 82 deletions(-)
+
+diff --git a/misc-utils/lsfd-unkn.c b/misc-utils/lsfd-unkn.c
+index 8f6e90846..dcb9c414a 100644
+--- a/misc-utils/lsfd-unkn.c
++++ b/misc-utils/lsfd-unkn.c
+@@ -19,8 +19,6 @@
+  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+ 
+-#include <linux/bpf.h>
+-#include <sys/syscall.h>
+ #include <sys/timerfd.h>
+ #include <time.h>
+ 
+@@ -29,9 +27,6 @@
+ 
+ #include "lsfd.h"
+ 
+-#define offsetofend(TYPE, MEMBER)				\
+-	(offsetof(TYPE, MEMBER)	+ sizeof_member(TYPE, MEMBER))
+-
+ struct unkn {
+ 	struct file file;
+ 	const struct anon_ops *anon_ops;
+@@ -1026,7 +1021,6 @@ static const char *bpf_prog_type_table[] = {
+ struct anon_bpf_prog_data {
+ 	int type;
+ 	int id;
+-	char name[BPF_OBJ_NAME_LEN + 1];
+ };
+ 
+ static bool anon_bpf_prog_probe(const char *str)
+@@ -1065,9 +1059,6 @@ static bool anon_bpf_prog_fill_column(struct proc *proc  __attribute__((__unused
+ 		else
+ 			xasprintf(str, "UNKNOWN(%d)", data->type);
+ 		return true;
+-	case COL_BPF_NAME:
+-		*str = xstrdup(data->name);
+-		return true;
+ 	default:
+ 		return false;
+ 	}
+@@ -1085,9 +1076,6 @@ static char *anon_bpf_prog_get_name(struct unkn *unkn)
+ 	else
+ 		xasprintf(&str, "id=%d type=UNKNOWN(%d)", data->id, data->type);
+ 
+-	if (*data->name)
+-		xstrfappend(&str, " name=%s", data->name);
+-
+ 	return str;
+ }
+ 
+@@ -1097,7 +1085,6 @@ static void anon_bpf_prog_init(struct unkn *unkn)
+ 	struct anon_bpf_prog_data *data = xmalloc(sizeof(*data));
+ 	data->type = -1;
+ 	data->id = -1;
+-	data->name[0] = '\0';
+ 	unkn->anon_data = data;
+ }
+ 
+@@ -1107,33 +1094,6 @@ static void anon_bpf_prog_free(struct unkn *unkn)
+ 	free(data);
+ }
+ 
+-static void anon_bpf_prog_get_more_info(struct anon_bpf_prog_data *prog_data)
+-{
+-	union bpf_attr attr = {
+-		.prog_id = (int32_t)prog_data->id,
+-		.next_id = 0,
+-		.open_flags = 0,
+-	};
+-	struct bpf_prog_info info = { 0 };
+-	union bpf_attr info_attr = {
+-		.info.info_len = sizeof(info),
+-		.info.info = (uint64_t)(uintptr_t)&info,
+-	};
+-
+-	int bpf_fd = syscall(SYS_bpf, BPF_PROG_GET_FD_BY_ID, &attr, sizeof(attr));
+-	if (bpf_fd < 0)
+-		return;
+-
+-	info_attr.info.bpf_fd = bpf_fd;
+-	if (syscall(SYS_bpf, BPF_OBJ_GET_INFO_BY_FD, &info_attr, offsetofend(union bpf_attr, info)) == 0) {
+-		memcpy(prog_data->name,
+-		       info.name,
+-		       BPF_OBJ_NAME_LEN);
+-		prog_data->name[BPF_OBJ_NAME_LEN] = '\0';
+-	}
+-	close(bpf_fd);
+-}
+-
+ static int anon_bpf_prog_handle_fdinfo(struct unkn *unkn, const char *key, const char *value)
+ {
+ 	if (strcmp(key, "prog_id") == 0) {
+@@ -1142,7 +1102,6 @@ static int anon_bpf_prog_handle_fdinfo(struct unkn *unkn, const char *key, const
+ 		if (rc < 0)
+ 			return 0; /* ignore -- parse failed */
+ 		((struct anon_bpf_prog_data *)unkn->anon_data)->id = (int)t;
+-		anon_bpf_prog_get_more_info((struct anon_bpf_prog_data *)unkn->anon_data);
+ 		return 1;
+ 	}
+ 
+@@ -1210,7 +1169,6 @@ static const char *bpf_map_type_table[] = {
+ struct anon_bpf_map_data {
+ 	int type;
+ 	int id;
+-	char name[BPF_OBJ_NAME_LEN + 1];
+ };
+ 
+ static bool anon_bpf_map_probe(const char *str)
+@@ -1249,9 +1207,6 @@ static bool anon_bpf_map_fill_column(struct proc *proc  __attribute__((__unused_
+ 		else
+ 			xasprintf(str, "UNKNOWN(%d)", data->type);
+ 		return true;
+-	case COL_BPF_NAME:
+-		*str = xstrdup(data->name);
+-		return true;
+ 	default:
+ 		return false;
+ 	}
+@@ -1268,10 +1223,6 @@ static char *anon_bpf_map_get_name(struct unkn *unkn)
+ 		xasprintf(&str, "id=%d type=%s", data->id, t);
+ 	else
+ 		xasprintf(&str, "id=%d type=UNKNOWN(%d)", data->id, data->type);
+-
+-	if (*data->name)
+-		xstrfappend(&str, " name=%s", data->name);
+-
+ 	return str;
+ }
+ 
+@@ -1280,7 +1231,6 @@ static void anon_bpf_map_init(struct unkn *unkn)
+ 	struct anon_bpf_map_data *data = xmalloc(sizeof(*data));
+ 	data->type = -1;
+ 	data->id = -1;
+-	data->name[0] = '\0';
+ 	unkn->anon_data = data;
+ }
+ 
+@@ -1290,33 +1240,6 @@ static void anon_bpf_map_free(struct unkn *unkn)
+ 	free(data);
+ }
+ 
+-static void anon_bpf_map_get_more_info(struct anon_bpf_map_data *map_data)
+-{
+-	union bpf_attr attr = {
+-		.map_id = (int32_t)map_data->id,
+-		.next_id = 0,
+-		.open_flags = 0,
+-	};
+-	struct bpf_map_info info = { 0 };
+-	union bpf_attr info_attr = {
+-		.info.info_len = sizeof(info),
+-		.info.info = (uint64_t)(uintptr_t)&info,
+-	};
+-
+-	int bpf_fd = syscall(SYS_bpf, BPF_MAP_GET_FD_BY_ID, &attr, sizeof(attr));
+-	if (bpf_fd < 0)
+-		return;
+-
+-	info_attr.info.bpf_fd = bpf_fd;
+-	if (syscall(SYS_bpf, BPF_OBJ_GET_INFO_BY_FD, &info_attr, offsetofend(union bpf_attr, info)) == 0) {
+-		memcpy(map_data->name,
+-		       info.name,
+-		       BPF_OBJ_NAME_LEN);
+-		map_data->name[BPF_OBJ_NAME_LEN] = '\0';
+-	}
+-	close(bpf_fd);
+-}
+-
+ static int anon_bpf_map_handle_fdinfo(struct unkn *unkn, const char *key, const char *value)
+ {
+ 	if (strcmp(key, "map_id") == 0) {
+@@ -1325,7 +1248,6 @@ static int anon_bpf_map_handle_fdinfo(struct unkn *unkn, const char *key, const
+ 		if (rc < 0)
+ 			return 0; /* ignore -- parse failed */
+ 		((struct anon_bpf_map_data *)unkn->anon_data)->id = (int)t;
+-		anon_bpf_map_get_more_info((struct anon_bpf_map_data *)unkn->anon_data);
+ 		return 1;
+ 	}
+ 
+diff --git a/misc-utils/lsfd.c b/misc-utils/lsfd.c
+index 771daef15..110629d27 100644
+--- a/misc-utils/lsfd.c
++++ b/misc-utils/lsfd.c
+@@ -160,9 +160,6 @@ static const struct colinfo infos[] = {
+ 	[COL_BPF_MAP_TYPE_RAW]= { "BPF-MAP.TYPE.RAW",
+ 				   0,   SCOLS_FL_RIGHT, SCOLS_JSON_NUMBER,
+ 				   N_("bpf map type (raw)") },
+-	[COL_BPF_NAME]         = { "BPF.NAME",
+-				   0,   SCOLS_FL_RIGHT, SCOLS_JSON_STRING,
+-				   N_("bpf object name") },
+ 	[COL_BPF_PROG_ID]      = { "BPF-PROG.ID",
+ 				   0,   SCOLS_FL_RIGHT, SCOLS_JSON_NUMBER,
+ 				   N_("bpf program id associated with the fd") },
+diff --git a/misc-utils/lsfd.h b/misc-utils/lsfd.h
+index 1859dc746..9874cf917 100644
+--- a/misc-utils/lsfd.h
++++ b/misc-utils/lsfd.h
+@@ -46,7 +46,6 @@ enum {
+ 	COL_BPF_MAP_ID,
+ 	COL_BPF_MAP_TYPE,
+ 	COL_BPF_MAP_TYPE_RAW,
+-	COL_BPF_NAME,
+ 	COL_BPF_PROG_ID,
+ 	COL_BPF_PROG_TYPE,
+ 	COL_BPF_PROG_TYPE_RAW,
+-- 
+2.43.0
+

@@ -11,6 +11,15 @@ PKG_DEPENDS_TARGET="toolchain elfutils"
 PKG_LONGDESC="libbpf supports building BPF CO-RE-enabled applications"
 PKG_TOOLCHAIN="make"
 
+# Rollback package for 4.9 kernel and avoid future conflicts on rebase
+case "${KODI_VENDOR}" in
+  amlogic-4.9)
+    PKG_VERSION="1.3.0"
+    PKG_SHA256="11db86acd627e468bc48b7258c1130aba41a12c4d364f78e184fd2f5a913d861"
+    PKG_URL="https://github.com/libbpf/libbpf/archive/refs/tags/v${PKG_VERSION}.tar.gz"
+    ;;
+esac
+
 make_target() {
   make BUILD_STATIC_ONLY=1 \
        PREFIX=${SYSROOT_PREFIX}/usr \

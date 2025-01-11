@@ -1,0 +1,28 @@
+diff --git a/gir/meson.build b/gir/meson.build
+index e5a7a131..f22d66ad 100644
+--- a/gir/meson.build
++++ b/gir/meson.build
+@@ -249,6 +249,7 @@ glib_gir = custom_target('gir-glib',
+   env: g_ir_scanner_env,
+   command: glib_command + [
+     '--cflags-begin'] + glib_includes + extra_giscanner_cflags + [
++    '-D__ARM_PCS_VFP',
+     '-DGLIB_COMPILATION',
+     '-DGOBJECT_COMPILATION',
+     '-D__G_I18N_LIB_H__',
+@@ -317,6 +318,7 @@ gobject_gir = custom_target('gir-gobject',
+   command: gobject_command + [
+     '--include-uninstalled=' + glib_gir.full_path(),
+     '--cflags-begin'] + glib_includes + extra_giscanner_cflags + [
++    '-D__ARM_PCS_VFP',
+     '-DGLIB_COMPILATION',
+     '-DGOBJECT_COMPILATION',
+     '--cflags-end',
+@@ -504,6 +506,7 @@ gir_girepository = custom_target('gir-girepository',
+     '--cflags-begin'] + glib_includes + extra_giscanner_cflags + [
+     '-I' + meson.current_source_dir() + '/../girepository',
+     '-I' + meson.current_build_dir() + '/../girepository',
++    '-D__ARM_PCS_VFP',
+     '-DGI_COMPILATION',
+     '--cflags-end',
+     '@INPUT@',

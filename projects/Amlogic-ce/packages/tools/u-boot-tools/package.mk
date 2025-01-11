@@ -11,6 +11,12 @@ PKG_DEPENDS_TARGET="toolchain u-boot-tools:host"
 PKG_LICENSE="GPL"
 PKG_LONGDESC="Das U-Boot is a cross-platform bootloader for embedded systems."
 
+post_unpack() {
+  cp ${PKG_BUILD}/include/libfdt.h ${PKG_BUILD}/lib/libfdt/
+  cp ${PKG_BUILD}/include/libfdt_env.h ${PKG_BUILD}/lib/libfdt/
+  cp ${PKG_BUILD}/include/fdt.h ${PKG_BUILD}/lib/libfdt/
+}
+
 make_host() {
   make mrproper
   make dummy_defconfig

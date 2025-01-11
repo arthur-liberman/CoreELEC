@@ -11,6 +11,15 @@ PKG_URL="https://github.com/systemd/systemd/archive/v${PKG_VERSION}.tar.gz"
 PKG_DEPENDS_TARGET="meson:host ninja:host gcc:host libcap kmod util-linux entropy libidn2 wait-time-sync Jinja2:host"
 PKG_LONGDESC="A system and session manager for Linux, compatible with SysV and LSB init scripts."
 
+# Rollback package for 4.9 kernel and avoid future conflicts on rebase
+case "${KODI_VENDOR}" in
+  amlogic-4.9)
+    PKG_VERSION="255.4"
+    PKG_SHA256="96e75bd08c57ad401677456fb88ef54a9f05bb1695693013bc6ecce839640fd5"
+    PKG_URL="https://github.com/systemd/systemd-stable/archive/v${PKG_VERSION}.tar.gz"
+    ;;
+esac
+
 PKG_MESON_OPTS_TARGET="--libdir=/usr/lib \
                        -Drootprefix=/usr \
                        -Dsplit-usr=false \

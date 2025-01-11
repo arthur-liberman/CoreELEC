@@ -1,0 +1,52 @@
+diff --git a/girepository/introspection/meson.build b/girepository/introspection/meson.build
+index a846a764c..6e33af791 100644
+--- a/girepository/introspection/meson.build
++++ b/girepository/introspection/meson.build
+@@ -90,6 +90,7 @@ glib_gir = gnome.generate_gir(libglib,
+   ],
+   env: gi_gen_env_variables,
+   extra_args: gir_args + [
++    '-D__ARM_PCS_VFP',
+     '-DGLIB_COMPILATION',
+     '-DGETTEXT_PACKAGE="dummy"',
+     '--symbol-prefix=glib',
+@@ -147,6 +148,7 @@ else
+     ],
+     env: gi_gen_env_variables,
+     extra_args: gir_args + [
++      '-D__ARM_PCS_VFP',
+       '-DGLIB_COMPILATION',
+       '-DGETTEXT_PACKAGE="dummy"',
+       '--symbol-prefix=glib',
+@@ -179,6 +181,7 @@ gobject_gir = gnome.generate_gir(libgobject,
+   dependencies: gi_gen_shared_dependencies,
+   env: gi_gen_env_variables,
+   extra_args: gir_args + [
++      '-D__ARM_PCS_VFP',
+       '-DGOBJECT_COMPILATION',
+       '--symbol-prefix=gobject',
+   ],
+@@ -208,6 +211,7 @@ gmodule_gir = gnome.generate_gir(libgmodule,
+   ],
+   env: gi_gen_env_variables,
+   extra_args: gir_args + [
++      '-D__ARM_PCS_VFP',
+       '-DGMODULE_COMPILATION',
+       '-DGETTEXT_PACKAGE="dummy"',
+       '--symbol-prefix=gmodule',
+@@ -229,6 +233,7 @@ gio_gir_sources = [
+ ]
+ gio_gir_packages = [ 'gio-2.0' ]
+ gio_gir_args = [
++  '-D__ARM_PCS_VFP',
+   '-DGIO_COMPILATION',
+   '-DG_SETTINGS_ENABLE_BACKEND',
+   '--symbol-prefix=gio',
+@@ -345,6 +350,7 @@ libgirepository_gir_sources = [
+ ]
+ libgirepository_gir_packages = [ 'girepository-2.0' ]
+ libgirepository_gir_args = [
++  '-D__ARM_PCS_VFP',
+   '-DGI_COMPILATION',
+   '--symbol-prefix=gi',
+   '--identifier-prefix=GI',
