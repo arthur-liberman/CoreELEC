@@ -1,0 +1,56 @@
+From 99ae1b0d80a744e3573a86cc09af1065e161b83d Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Thu, 9 Jan 2025 00:06:41 +0200
+Subject: [PATCH 03/13] Revert "alsa: drop obsolete
+ 'aml_set_audio_passthrough'"
+
+This reverts commit 6074987208e5fdbe186aeeff42a4b93e65f93d36.
+---
+ xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp | 1 +
+ xbmc/utils/AMLUtils.cpp                     | 5 +++++
+ xbmc/utils/AMLUtils.h                       | 1 +
+ 3 files changed, 7 insertions(+)
+
+diff --git a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
+index 2ec145c19d..9b5699ec40 100644
+--- a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
++++ b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
+@@ -818,6 +818,7 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
+       }
+     }
+ 
++    aml_set_audio_passthrough(m_passthrough);
+     aml_configure_simple_control(device, codec);
+   }
+ 
+diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
+index 589ce6a405..f8c1513003 100644
+--- a/xbmc/utils/AMLUtils.cpp
++++ b/xbmc/utils/AMLUtils.cpp
+@@ -275,6 +275,11 @@ void aml_video_mute(bool mute)
+   }
+ }
+ 
++void aml_set_audio_passthrough(bool passthrough)
++{
++  CSysfsPath("/sys/class/audiodsp/digital_raw", (passthrough ? 2 : 0));
++}
++
+ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int view_mode)
+ {
+   int fd;
+diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
+index 473ccf6f76..7a43922c11 100644
+--- a/xbmc/utils/AMLUtils.h
++++ b/xbmc/utils/AMLUtils.h
+@@ -80,6 +80,7 @@ bool aml_dolby_vision_enabled();
+ bool aml_has_frac_rate_policy();
+ bool aml_video_started();
+ void aml_video_mute(bool mute);
++void aml_set_audio_passthrough(bool passthrough);
+ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int view_mode);
+ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res);
+ bool aml_get_native_resolution(RESOLUTION_INFO *res);
+-- 
+2.47.1
+

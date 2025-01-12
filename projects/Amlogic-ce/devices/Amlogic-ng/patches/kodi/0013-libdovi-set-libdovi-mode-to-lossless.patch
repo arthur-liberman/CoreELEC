@@ -1,0 +1,25 @@
+From 63686422d6cb3e26bb78ef7d2cf8ed65f8964f03 Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Thu, 9 Jan 2025 16:12:04 +0200
+Subject: [PATCH 13/13] libdovi: set libdovi mode to lossless
+
+---
+ system/settings/settings.xml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/system/settings/settings.xml b/system/settings/settings.xml
+index bab37900e3..087197228a 100755
+--- a/system/settings/settings.xml
++++ b/system/settings/settings.xml
+@@ -317,7 +317,7 @@
+             </dependency>
+           </dependencies>
+           <level>2</level>
+-          <default>2</default>
++          <default>0</default>
+           <control type="toggle" />
+         </setting>
+         <setting id="videoplayer.allowedhdrformats" type="list[integer]" label="39198" help="39199">
+-- 
+2.47.1
+

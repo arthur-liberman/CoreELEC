@@ -1,0 +1,155 @@
+From a2936ce58241221830c2a4dbe515b527b07a5b93 Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Thu, 9 Jan 2025 00:06:41 +0200
+Subject: [PATCH 04/13] Revert "alsa: use tdm-b on s5 for hbr passthrough"
+
+This reverts commit 3d3dc28dc33e9f1d93cba843fa30b541e9ec67ef.
+---
+ .../AudioEngine/Engines/ActiveAE/ActiveAE.cpp |  2 --
+ .../Engines/ActiveAE/ActiveAESettings.cpp     |  5 ++---
+ .../Engines/ActiveAE/ActiveAESink.cpp         |  8 +++----
+ xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp   | 21 +++----------------
+ 4 files changed, 9 insertions(+), 27 deletions(-)
+
+diff --git a/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAE.cpp b/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAE.cpp
+index d552074354..614e6178b8 100644
+--- a/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAE.cpp
++++ b/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAE.cpp
+@@ -2649,8 +2649,6 @@ void CActiveAE::LoadSettings(AEAudioFormat *format)
+ 
+   switch (aml_get_cpufamily_id())
+   {
+-    case AML_S5:
+-      [[fallthrough]];
+     case AML_T7:
+       {
+         // find on NEWSTREAM the matching passthrough device by device type
+diff --git a/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.cpp b/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.cpp
+index 51582a60ff..022c679e17 100644
+--- a/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.cpp
++++ b/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESettings.cpp
+@@ -174,11 +174,10 @@ void CActiveAESettings::SettingOptionsAudioDevicesFillerGeneral(
+     list.emplace_back("Error - no devices found", "error");
+   else
+   {
+-    bool filter_passthrough = (aml_get_cpufamily_id() == AML_S5 || aml_get_cpufamily_id() == AML_T7);
+     for (AEDeviceList::const_iterator sink = sinkList.begin(); sink != sinkList.end(); ++sink)
+     {
+-      // filter L-PCM device when passthrough on Amlogic S5/T7
+-      if (passthrough && filter_passthrough &&
++      // filter L-PCM device when passthrough on Amlogic T7
++      if (passthrough && aml_get_cpufamily_id() == AML_T7 &&
+           StringUtils::StartsWith(sink->second, "ALSA:surround71"))
+         continue;
+ 
+diff --git a/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESink.cpp b/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESink.cpp
+index e397ca6567..37fae7b173 100644
+--- a/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESink.cpp
++++ b/xbmc/cores/AudioEngine/Engines/ActiveAE/ActiveAESink.cpp
+@@ -751,7 +751,7 @@ std::string CActiveAESink::ValidateOuputDevice(const std::string& device, bool p
+         if (!passthrough && d.m_onlyPassthrough)
+           continue;
+ 
+-        // filter L-PCM device when passthrough on Amlogic S5/T7
++        // filter L-PCM device when passthrough on Amlogic T7
+         if (passthrough && (d.m_deviceName.substr(0, d.m_deviceName.find(':')) == "surround71"))
+           continue;
+ 
+@@ -777,7 +777,7 @@ std::string CActiveAESink::ValidateOuputDevice(const std::string& device, bool p
+         if (!passthrough && d.m_onlyPassthrough)
+           continue;
+ 
+-        // filter L-PCM device when passthrough on Amlogic S5/T7
++        // filter L-PCM device when passthrough on Amlogic T7
+         if (passthrough && (d.m_deviceName.substr(0, d.m_deviceName.find(':')) == "surround71"))
+           continue;
+ 
+@@ -805,7 +805,7 @@ std::string CActiveAESink::ValidateOuputDevice(const std::string& device, bool p
+         if (!passthrough && d.m_onlyPassthrough)
+           continue;
+ 
+-        // filter L-PCM device when passthrough on Amlogic S5/T7
++        // filter L-PCM device when passthrough on Amlogic T7
+         if (passthrough && (d.m_deviceName.substr(0, d.m_deviceName.find(':')) == "surround71"))
+           continue;
+ 
+@@ -838,7 +838,7 @@ std::string CActiveAESink::ValidateOuputDevice(const std::string& device, bool p
+       if (!passthrough && d.m_onlyPassthrough)
+         continue;
+ 
+-      // filter L-PCM device when passthrough on Amlogic S5/T7
++      // filter L-PCM device when passthrough on Amlogic T7
+       if (passthrough && (d.m_deviceName.substr(0, d.m_deviceName.find(':')) == "surround71"))
+         continue;
+ 
+diff --git a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
+index 9b5699ec40..fb6b22eb34 100644
+--- a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
++++ b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
+@@ -576,7 +576,7 @@ void CAESinkALSA::aml_configure_simple_control(std::string &device, const enum I
+     "Audio spdif_b format",        // set SPDIF-B codec format
+     "",
+     "",
+-    "Audio I2S to HDMITX Format"  // set TDM codec format
++    "Audio I2S to HDMITX Format"  // set TDM-C codec format
+   };
+ 
+   int cardNr = 0;
+@@ -639,17 +639,6 @@ void CAESinkALSA::aml_configure_simple_control(std::string &device, const enum I
+             case AE_DEVTYPE_HDMI:
+             case AE_DEVTYPE_PCM:
+               switch (soc_id) {
+-                case AML_S5:
+-                  switch (codec) {
+-                    case TRUEHD:
+-                    case _DTS_HD_MA:
+-                      spdif_id = HDMITX_SRC_TDM_B;
+-                      break;
+-                    default:
+-                      spdif_id = HDMITX_SRC_SPDIF_B;
+-                      break;
+-                  }
+-                  break;
+                 case AML_T7:
+                   switch (codec) {
+                     case TRUEHD:
+@@ -1619,9 +1608,8 @@ void CAESinkALSA::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
+ 
+ AEDeviceType CAESinkALSA::AEDeviceTypeFromName(const std::string &name)
+ {
+-  bool mark_surround71_as_hdmi = (aml_get_cpufamily_id() == AML_S5 || aml_get_cpufamily_id() == AML_T7);
+   if (name.substr(0, name.find(':')) == "hdmi" ||
+-     (mark_surround71_as_hdmi && name.substr(0, name.find(':')) == "surround71"))
++     (aml_get_cpufamily_id() == AML_T7 && name.substr(0, name.find(':')) == "surround71"))
+     return AE_DEVTYPE_HDMI;
+   else if (name.substr(0, name.find(':')) == "iec958" || name.substr(0, name.find(':')) == "spdif")
+     return AE_DEVTYPE_IEC958;
+@@ -1880,7 +1868,6 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
+ 
+   if (GetAMLDeviceType(info.m_displayName) != AML_NONE)
+   {
+-    bool use_surround71_as_lpcm = (aml_get_cpufamily_id() == AML_S5 || aml_get_cpufamily_id() == AML_T7);
+     if (info.m_deviceType == AE_DEVTYPE_IEC958)
+       info.m_displayNameExtra = "S/PDIF";
+     else if (info.m_deviceType != AE_DEVTYPE_HDMI)
+@@ -1890,7 +1877,7 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
+       else
+         info.m_displayNameExtra = "PCM";
+     }
+-    else if (use_surround71_as_lpcm && info.m_deviceType == AE_DEVTYPE_HDMI)
++    else if (aml_get_cpufamily_id() == AML_T7 && info.m_deviceType == AE_DEVTYPE_HDMI)
+     {
+       if (device.substr(0, device.find(':')) == "surround71")
+         info.m_displayNameExtra = "HDMI Multi Ch PCM";
+@@ -1902,8 +1889,6 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
+   {
+     switch (aml_get_cpufamily_id())
+     {
+-      case AML_S5:
+-        [[fallthrough]];
+       case AML_T7:
+         {
+           if (device.substr(0, device.find(':')) == "surround71")
+-- 
+2.47.1
+

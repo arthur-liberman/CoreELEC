@@ -1,0 +1,183 @@
+From d2e1ea05716a8ffb86f947b9139dba9da1a89625 Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Thu, 9 Jan 2025 00:06:41 +0200
+Subject: [PATCH 02/13] Revert "AMLCodec: add support for AVS2, AVS3 and H266
+ hardware decoder"
+
+This reverts commit 01cbab691387b6894283189aff8265d367f19f32.
+---
+ .../VideoPlayer/DVDCodecs/Video/AMLCodec.cpp  | 27 -----------------
+ .../DVDCodecs/Video/DVDVideoCodecAmlogic.cpp  | 24 ---------------
+ xbmc/utils/AMLUtils.cpp                       | 30 -------------------
+ xbmc/utils/AMLUtils.h                         |  3 --
+ 4 files changed, 84 deletions(-)
+
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
+index f0f487b5cf..931fd2a687 100644
+--- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
+@@ -432,18 +432,9 @@ static vformat_t codecid_to_vformat(enum AVCodecID id)
+     case AV_CODEC_ID_CAVS:
+       format = VFORMAT_AVS;
+       break;
+-    case AV_CODEC_ID_AVS2:
+-      format = VFORMAT_AVS2;
+-      break;
+-    case AV_CODEC_ID_AVS3:
+-      format = VFORMAT_AVS3;
+-      break;
+     case AV_CODEC_ID_HEVC:
+       format = VFORMAT_HEVC;
+       break;
+-    case AV_CODEC_ID_VVC:
+-      format = VFORMAT_H266;
+-      break;
+ 
+     default:
+       format = VFORMAT_UNSUPPORT;
+@@ -558,22 +549,10 @@ static vdec_type_t codec_tag_to_vdec_type(unsigned int codec_tag)
+       // avs
+       dec_type = VIDEO_DEC_FORMAT_AVS;
+       break;
+-    case AV_CODEC_ID_AVS2:
+-      // avs2
+-      dec_type = VIDEO_DEC_FORMAT_AVS2;
+-      break;
+-    case AV_CODEC_ID_AVS3:
+-      // avs2
+-      dec_type = VIDEO_DEC_FORMAT_AVS3;
+-      break;
+     case AV_CODEC_ID_HEVC:
+       // h265
+       dec_type = VIDEO_DEC_FORMAT_HEVC;
+       break;
+-    case AV_CODEC_ID_VVC:
+-      // h266
+-      dec_type = VIDEO_DEC_FORMAT_H266;
+-      break;
+     default:
+       dec_type = VIDEO_DEC_FORMAT_UNKNOW;
+       break;
+@@ -2129,12 +2108,6 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+       if (m_hints.ptsinvalid)
+         am_private->gcodec.param = (void*)(EXTERNAL_PTS | SYNC_OUTSIDE);
+       break;
+-    case VFORMAT_H266:
+-      am_private->gcodec.format = VIDEO_DEC_FORMAT_H266;
+-      am_private->gcodec.param  = (void*)EXTERNAL_PTS;
+-      if (m_hints.ptsinvalid)
+-        am_private->gcodec.param = (void*)(EXTERNAL_PTS | SYNC_OUTSIDE);
+-      break;
+     case VFORMAT_VP9:
+       am_private->gcodec.format = VIDEO_DEC_FORMAT_VP9;
+       am_private->gcodec.param  = (void*)EXTERNAL_PTS;
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
+index eebbed1f7d..7b8e645ca8 100644
+--- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
+@@ -268,22 +268,6 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
+     case AV_CODEC_ID_CAVS:
+       m_pFormatName = "am-avs";
+       break;
+-    case AV_CODEC_ID_AVS2:
+-      if (!aml_support_avs2())
+-      {
+-        CLog::Log(LOGDEBUG, "{}::{} - AVS2 hardward decoder is not supported on current platform", __MODULE_NAME__, __FUNCTION__);
+-        goto FAIL;
+-      }
+-      m_pFormatName = "am-avs2";
+-      break;
+-    case AV_CODEC_ID_AVS3:
+-      if (!aml_support_avs3())
+-      {
+-        CLog::Log(LOGDEBUG, "{}::{} - AVS3 hardward decoder is not supported on current platform", __MODULE_NAME__, __FUNCTION__);
+-        goto FAIL;
+-      }
+-      m_pFormatName = "am-avs2";
+-      break;
+     case AV_CODEC_ID_VP9:
+       if (!aml_support_vp9())
+       {
+@@ -356,14 +340,6 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
+       m_hints.extradata = FFmpegExtraData(m_bitstream->GetExtraSize());
+       memcpy(m_hints.extradata.GetData(), m_bitstream->GetExtraData(), m_hints.extradata.GetSize());
+       break;
+-    case AV_CODEC_ID_VVC:
+-      if (!aml_support_h266())
+-      {
+-        CLog::Log(LOGDEBUG, "{}::{} - H266 hardward decoder is not supported on current platform", __MODULE_NAME__, __FUNCTION__);
+-        goto FAIL;
+-      }
+-      m_pFormatName = "am-h266";
+-      break;
+     default:
+       CLog::Log(LOGDEBUG, "{}: Unknown hints.codec({:d})", __MODULE_NAME__, m_hints.codec);
+       goto FAIL;
+diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
+index 95630f4666..589ce6a405 100644
+--- a/xbmc/utils/AMLUtils.cpp
++++ b/xbmc/utils/AMLUtils.cpp
+@@ -175,16 +175,6 @@ bool aml_support_hevc_10bit()
+   return (has_hevc_10bit == 1);
+ }
+ 
+-bool aml_support_h266()
+-{
+-  static int has_h266 = -1;
+-
+-  if (has_h266 == -1)
+-    has_h266 = aml_support_vcodec_profile("\\bh266\\b:");
+-
+-  return (has_h266 == 1);
+-}
+-
+ AML_SUPPORT_H264_4K2K aml_support_h264_4k2k()
+ {
+   static AML_SUPPORT_H264_4K2K has_h264_4k2k = AML_SUPPORT_H264_4K2K_UNINIT;
+@@ -221,26 +211,6 @@ bool aml_support_av1()
+   return (has_av1 == 1);
+ }
+ 
+-bool aml_support_avs2()
+-{
+-  static int has_avs2 = -1;
+-
+-  if (has_avs2 == -1)
+-    has_avs2 = aml_support_vcodec_profile("(\\bavs2\\b|\\bavs2_fb\\b):(?!\\;).*compressed");
+-
+-  return (has_avs2 == 1);
+-}
+-
+-bool aml_support_avs3()
+-{
+-  static int has_avs3 = -1;
+-
+-  if (has_avs3 == -1)
+-    has_avs3 = aml_support_vcodec_profile("\\bavs3\\b:(?!\\;).*compressed");
+-
+-  return (has_avs3 == 1);
+-}
+-
+ bool aml_support_dolby_vision()
+ {
+   static int support_dv = -1;
+diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
+index a8b9bfae1c..473ccf6f76 100644
+--- a/xbmc/utils/AMLUtils.h
++++ b/xbmc/utils/AMLUtils.h
+@@ -72,12 +72,9 @@ bool aml_support_hevc();
+ bool aml_support_hevc_4k2k();
+ bool aml_support_hevc_8k4k();
+ bool aml_support_hevc_10bit();
+-bool aml_support_h266();
+ AML_SUPPORT_H264_4K2K aml_support_h264_4k2k();
+ bool aml_support_vp9();
+ bool aml_support_av1();
+-bool aml_support_avs2();
+-bool aml_support_avs3();
+ bool aml_support_dolby_vision();
+ bool aml_dolby_vision_enabled();
+ bool aml_has_frac_rate_policy();
+-- 
+2.47.1
+

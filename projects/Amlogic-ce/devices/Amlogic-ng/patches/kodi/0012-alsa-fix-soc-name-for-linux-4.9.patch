@@ -1,0 +1,25 @@
+From 4daec4d5ab80709bf8e8b2ffc72dca32f9ec23fb Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Thu, 9 Jan 2025 01:41:54 +0200
+Subject: [PATCH 12/13] alsa: fix soc name for linux 4.9
+
+---
+ xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
+index e137df228e..9316af4da6 100644
+--- a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
++++ b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
+@@ -661,7 +661,7 @@ void CAESinkALSA::aml_configure_simple_control(std::string &device, const enum I
+           }
+ 
+           CLog::Log(LOGINFO, "CAESinkALSA - Set Spdif to HDMITX to \"{}\"", AMLSpdifIDToStr(spdif_id).c_str());
+-          snd_mixer_selem_id_set_name(sid, "HDMITX Audio Source Select");
++          snd_mixer_selem_id_set_name(sid, "Spdif to HDMITX Select");
+           elem = snd_mixer_find_selem(handle, sid);
+           if (!elem) {
+             CLog::Log(LOGERROR, "CAESinkALSA - Unable to find simple control '{}',{:d}\n",
+-- 
+2.47.1
+

@@ -1,0 +1,84 @@
+From 2d98bc072a8870bbc75341954ef1c9dd24c170f0 Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Thu, 9 Jan 2025 00:07:09 +0200
+Subject: [PATCH 09/13] Revert "Change module paths to match Amlogic 5.4
+ kernel"
+
+This reverts commit 355ce0a8ead7347c2c92c9a40c0be44305ba86f7.
+---
+ xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp |  4 ++--
+ xbmc/utils/AMLUtils.cpp                             |  2 +-
+ xbmc/windowing/amlogic/WinSystemAmlogic.cpp         | 10 +++++-----
+ 3 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
+index 931fd2a687..fcd8f4d969 100644
+--- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
+@@ -2015,7 +2015,7 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+   if (dv_enable)
+   {
+     // enable Dolby Vision
+-    CSysfsPath("/sys/module/aml_media/parameters/dolby_vision_enable", 'Y');
++    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", 'Y');
+ 
+     // use player led mode when enabled
+     CSysfsPath dolby_vision_ll_policy{"/sys/module/aml_media/parameters/dolby_vision_ll_policy"};
+@@ -2300,7 +2300,7 @@ void CAMLCodec::CloseDecoder()
+   // return tsync to default so external apps work
+   CSysfsPath("/sys/class/tsync/enable", 1);
+   // disable Dolby Vision driver
+-  CSysfsPath dolby_vision_enable{"/sys/module/aml_media/parameters/dolby_vision_enable"};
++  CSysfsPath dolby_vision_enable{"/sys/module/amdolby_vision/parameters/dolby_vision_enable"};
+   if (dolby_vision_enable.Exists() && StringUtils::EqualsNoCase(dolby_vision_enable.Get<std::string>().value(), "Y"))
+   {
+     CSysfsPath dv_video_on{"/sys/class/amdolby_vision/dv_video_on"};
+diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
+index 143778cd5f..9d3bad072a 100644
+--- a/xbmc/utils/AMLUtils.cpp
++++ b/xbmc/utils/AMLUtils.cpp
+@@ -289,7 +289,7 @@ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int vie
+       CLog::Log(LOGERROR, "AMLUtils::{} - unable to set 3D video mode 0x%x", __FUNCTION__, mode);
+     close(fd);
+ 
+-    CSysfsPath("/sys/module/aml_media/parameters/framepacking_support", framepacking_support ? 1 : 0);
++    CSysfsPath("/sys/module/amvideo/parameters/framepacking_support", framepacking_support ? 1 : 0);
+     CSysfsPath("/sys/module/amvdec_h264mvc/parameters/view_mode", view_mode);
+   }
+ }
+diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
+index 287cabdb44..5191c20129 100644
+--- a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
++++ b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
+@@ -87,23 +87,23 @@ bool CWinSystemAmlogic::InitWindowSystem()
+   if (settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_NOISEREDUCTION))
+   {
+      CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem -- disabling noise reduction");
+-     CSysfsPath("/sys/module/aml_media/parameters/nr2_en", 0);
++     CSysfsPath("/sys/module/di/parameters/nr2_en", 0);
+   }
+ 
+   int sdr2hdr = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_SDR2HDR);
+   if (sdr2hdr)
+   {
+     CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem -- setting sdr2hdr mode to {:d}", sdr2hdr);
+-    CSysfsPath("/sys/module/aml_media/parameters/sdr_mode", 1);
+-    CSysfsPath("/sys/module/aml_media/parameters/dolby_vision_policy", 0);
+-    CSysfsPath("/sys/module/aml_media/parameters/hdr_policy", 0);
++    CSysfsPath("/sys/module/am_vecm/parameters/sdr_mode", 1);
++    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", 0);
++    CSysfsPath("/sys/module/am_vecm/parameters/hdr_policy", 0);
+   }
+ 
+   int hdr2sdr = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_HDR2SDR);
+   if (hdr2sdr)
+   {
+     CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem -- setting hdr2sdr mode to {:d}", hdr2sdr);
+-    CSysfsPath("/sys/module/aml_media/parameters/hdr_mode", 1);
++    CSysfsPath("/sys/module/am_vecm/parameters/hdr_mode", 1);
+   }
+ 
+   if (!aml_support_dolby_vision() || !aml_display_support_dv())
+-- 
+2.47.1
+

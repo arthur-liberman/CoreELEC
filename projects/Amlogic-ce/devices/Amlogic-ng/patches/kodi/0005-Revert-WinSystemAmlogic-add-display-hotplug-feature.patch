@@ -1,0 +1,769 @@
+From 3abe60374154dbf5b2861f82a179b2caa5359299 Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Thu, 9 Jan 2025 00:06:41 +0200
+Subject: [PATCH 05/13] Revert "WinSystemAmlogic: add display hotplug feature"
+
+This reverts commit de81a3dde93e9d641a63d7b7526189599acab4d2.
+---
+ xbmc/settings/DisplaySettings.cpp           |   2 +-
+ xbmc/utils/AMLUtils.cpp                     | 356 ++------------------
+ xbmc/utils/AMLUtils.h                       |   4 -
+ xbmc/windowing/amlogic/WinSystemAmlogic.cpp | 127 -------
+ xbmc/windowing/amlogic/WinSystemAmlogic.h   |  12 -
+ 5 files changed, 30 insertions(+), 471 deletions(-)
+
+diff --git a/xbmc/settings/DisplaySettings.cpp b/xbmc/settings/DisplaySettings.cpp
+index 640769f9ad..aa27708566 100644
+--- a/xbmc/settings/DisplaySettings.cpp
++++ b/xbmc/settings/DisplaySettings.cpp
+@@ -117,7 +117,7 @@ static bool write_resolution_ini(RESOLUTION_INFO res)
+   if (!result && fsInfo.f_flags & MS_RDONLY)
+     result = mount(NULL, aml_res_path.c_str(), NULL, MS_NOATIME | MS_REMOUNT, NULL);
+ 
+-  if (!result && !res.strId.empty() && !StringUtils::EqualsNoCase(res.strId, "dummy_l"))
++  if (!result && !res.strId.empty())
+   {
+     std::ofstream ofs(aml_res_path + "/" + aml_res_file, std::ofstream::out);
+     ofs << "# WARNING DO NOT MODIFY THIS FILE! ALL CHANGES WILL BE LOST!\n";
+diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
+index f8c1513003..513f899eaf 100644
+--- a/xbmc/utils/AMLUtils.cpp
++++ b/xbmc/utils/AMLUtils.cpp
+@@ -426,13 +426,6 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+       height = 2160;
+       *smode = 'p';
+     }
+-    else if (StringUtils::EqualsNoCase(fromMode, "dummy_l"))
+-    {
+-      width = 1920;
+-      height = 1080;
+-      rrate = 60;
+-      *smode = 'p';
+-    }
+     else
+     {
+       return false;
+@@ -530,7 +523,7 @@ drmModeResPtr aml_get_drmDevice_resources(int fd)
+ }
+ 
+ // get connector of drmDevice
+-drmModeConnectorPtr aml_get_drmDevice_connector(int fd, drmModeResPtr resources, drmModeConnection *connection)
++drmModeConnectorPtr aml_get_drmDevice_connector(int fd, drmModeResPtr resources)
+ {
+   drmModeConnectorPtr connector = NULL;
+ 
+@@ -549,12 +542,13 @@ drmModeConnectorPtr aml_get_drmDevice_connector(int fd, drmModeResPtr resources,
+     if (connector == NULL)
+       continue;
+ 
+-    // connector state as always connected but encoder_id == 0 if not connected
+-    if (connection)
+-      *connection = (connector->encoder_id ? DRM_MODE_CONNECTED : DRM_MODE_DISCONNECTED);
+-
+-    if (connector->connector_type == DRM_MODE_CONNECTOR_HDMIA)
++    if (connector->connection == DRM_MODE_CONNECTED)
+       break;
++    else
++    {
++      drmModeFreeConnector(connector);
++      connector = NULL;
++    }
+   }
+ 
+   return connector;
+@@ -614,47 +608,6 @@ drmModeCrtcPtr aml_get_drmDevice_crtc(int fd, drmModeResPtr resources, drmModeEn
+   return crtc;
+ }
+ 
+-// get modes count and status if current device is connected
+-int aml_get_drmDevice_modes_count(drmModeConnection *connection)
+-{
+-  int mode_count = 0;
+-  int fd = aml_get_drmDevice();
+-  drmModeResPtr resources = NULL;
+-  drmModeConnectorPtr connector = NULL;
+-
+-  if (fd < 0)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - could not get drmDevice", __FUNCTION__);
+-    return mode_count;
+-  }
+-
+-  resources = aml_get_drmDevice_resources(fd);
+-  if (!resources)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - failed to get resources of drmDevice", __FUNCTION__);
+-    close(fd);
+-    return mode_count;
+-  }
+-
+-  connector = aml_get_drmDevice_connector(fd, resources, connection);
+-  if (!connector)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
+-    drmModeFreeResources(resources);
+-    close(fd);
+-    return mode_count;
+-  }
+-
+-  CLog::Log(LOGDEBUG, "AMLUtils::{} - connector have {:d} modes", __FUNCTION__, connector->count_modes);
+-  mode_count = connector->count_modes;
+-
+-  drmModeFreeResources(resources);
+-  drmModeFreeConnector(connector);
+-  close(fd);
+-
+-  return mode_count;
+-}
+-
+ // get all modes of current connected device
+ std::string aml_get_drmDevice_modes(void)
+ {
+@@ -677,7 +630,7 @@ std::string aml_get_drmDevice_modes(void)
+     return modes;
+   }
+ 
+-  connector = aml_get_drmDevice_connector(fd, resources, NULL);
++  connector = aml_get_drmDevice_connector(fd, resources);
+   if (!connector)
+   {
+     CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
+@@ -736,10 +689,9 @@ int get_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_type
+   return ret;
+ }
+ 
+-void set_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_type, unsigned int value, drmModeAtomicReqPtr req)
++void set_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_type, unsigned int value)
+ {
+   unsigned int i;
+-  int res;
+   drmModeObjectPropertiesPtr props = NULL;
+ 
+   props = drmModeObjectGetProperties(fd, id, obj_type);
+@@ -758,16 +710,8 @@ void set_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_typ
+ 
+     if (StringUtils::EqualsNoCase(prop->name, name))
+     {
+-      if (req == NULL)
+-      {
+-        if ((res = drmModeObjectSetProperty(fd, id, obj_type, props->props[i], value)) != 0)
+-          CLog::Log(LOGERROR, "AMLUtils::{} - unable to set property '{}', value: {:d}, res: {:d}", __FUNCTION__, prop->name, value, res);
+-      }
+-      else
+-      {
+-        if ((res = drmModeAtomicAddProperty(req, id, props->props[i], value)) < 0)
+-          CLog::Log(LOGERROR, "AMLUtils::{} - unable to add property '{}', value: {:d}, res: {:d}", __FUNCTION__, prop->name, value, res);
+-      }
++      if (drmModeObjectSetProperty(fd, id, obj_type, props->props[i], value))
++        CLog::Log(LOGERROR, "AMLUtils::{} - unable to set property '{}', value: {:d}", __FUNCTION__, prop->name, value);
+ 
+       CLog::Log(LOGDEBUG, "AMLUtils::{} - set property '{}', value: {:d}", __FUNCTION__, prop->name, value);
+       drmModeFreeProperty(prop);
+@@ -789,7 +733,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+   drmModeEncoderPtr encoder = NULL;
+   drmModeCrtcPtr crtc = NULL;
+   unsigned int id;
+-  drmModeConnection connection;
+ 
+   if (fd < 0)
+   {
+@@ -805,7 +748,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+     return;
+   }
+ 
+-  connector = aml_get_drmDevice_connector(fd, resources, &connection);
++  connector = aml_get_drmDevice_connector(fd, resources);
+   if (!connector)
+   {
+     CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
+@@ -814,15 +757,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+     return;
+   }
+ 
+-  if (connection != DRM_MODE_CONNECTED)
+-  {
+-    CLog::Log(LOGWARNING, "AMLUtils::{} - connector of drmDevice is not connected", __FUNCTION__);
+-    drmModeFreeResources(resources);
+-    drmModeFreeConnector(connector);
+-    close(fd);
+-    return;
+-  }
+-
+   encoder = aml_get_drmDevice_encoder(fd, resources, connector);
+   if (!encoder)
+   {
+@@ -858,7 +792,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+       return;
+   }
+ 
+-  set_drmProp(fd, id, name, obj_type, value, NULL);
++  set_drmProp(fd, id, name, obj_type, value);
+ 
+   drmModeFreeResources(resources);
+   drmModeFreeConnector(connector);
+@@ -877,7 +811,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+   drmModeEncoderPtr encoder = NULL;
+   drmModeCrtcPtr crtc = NULL;
+   unsigned int id;
+-  drmModeConnection connection;
+ 
+   if (fd < 0)
+   {
+@@ -893,7 +826,7 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+     return ret;
+   }
+ 
+-  connector = aml_get_drmDevice_connector(fd, resources, &connection);
++  connector = aml_get_drmDevice_connector(fd, resources);
+   if (!connector)
+   {
+     CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
+@@ -902,23 +835,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+     return ret;
+   }
+ 
+-  if (connection != DRM_MODE_CONNECTED)
+-  {
+-    CLog::Log(LOGWARNING, "AMLUtils::{} - connector of drmDevice is not connected", __FUNCTION__);
+-
+-    switch (obj_type) {
+-      case DRM_MODE_OBJECT_CONNECTOR:
+-        id = connector->connector_id;
+-        ret = get_drmProp(fd, id, name, obj_type);
+-        [[fallthrough]];
+-      default:
+-        drmModeFreeResources(resources);
+-        drmModeFreeConnector(connector);
+-        close(fd);
+-        return ret;
+-    }
+-  }
+-
+   encoder = aml_get_drmDevice_encoder(fd, resources, connector);
+   if (!encoder)
+   {
+@@ -974,8 +890,6 @@ std::string aml_get_drmDevice_mode(void)
+   drmModeEncoderPtr encoder = NULL;
+   drmModeCrtcPtr crtc = NULL;
+   std::string mode = "";
+-  std::string default_mode = "dummy_l";
+-  drmModeConnection connection;
+ 
+   if (fd < 0)
+   {
+@@ -991,7 +905,7 @@ std::string aml_get_drmDevice_mode(void)
+     return mode;
+   }
+ 
+-  connector = aml_get_drmDevice_connector(fd, resources, &connection);
++  connector = aml_get_drmDevice_connector(fd, resources);
+   if (!connector)
+   {
+     CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
+@@ -1000,16 +914,6 @@ std::string aml_get_drmDevice_mode(void)
+     return mode;
+   }
+ 
+-  if (connection != DRM_MODE_CONNECTED)
+-  {
+-    mode.assign(default_mode);
+-    CLog::Log(LOGWARNING, "AMLUtils::{} - connector of drmDevice is not connected, use default mode '{}'", __FUNCTION__, mode);
+-    drmModeFreeResources(resources);
+-    drmModeFreeConnector(connector);
+-    close(fd);
+-    return mode;
+-  }
+-
+   encoder = aml_get_drmDevice_encoder(fd, resources, connector);
+   if (!encoder)
+   {
+@@ -1044,191 +948,6 @@ std::string aml_get_drmDevice_mode(void)
+   return mode;
+ }
+ 
+-// get preferred mode of drmDevice
+-std::string aml_get_drmDevice_preferred_mode(void)
+-{
+-  std::string mode, modes = "";
+-  int fd = aml_get_drmDevice();
+-  drmModeResPtr resources = NULL;
+-  drmModeConnectorPtr connector = NULL;
+-
+-  if (fd < 0)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - could not get drmDevice", __FUNCTION__);
+-    return modes;
+-  }
+-
+-  resources = aml_get_drmDevice_resources(fd);
+-  if (!resources)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - failed to get resources of drmDevice", __FUNCTION__);
+-    close(fd);
+-    return modes;
+-  }
+-
+-  connector = aml_get_drmDevice_connector(fd, resources, NULL);
+-  if (!connector)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
+-    drmModeFreeResources(resources);
+-    close(fd);
+-    return modes;
+-  }
+-
+-  CLog::Log(LOGDEBUG, "AMLUtils::{} - connector have {:d} modes", __FUNCTION__, connector->count_modes);
+-  for (int i = 0; i < connector->count_modes; i++)
+-  {
+-    if (connector->modes[i].type & DRM_MODE_TYPE_PREFERRED)
+-    {
+-      mode.assign(connector->modes[i].name);
+-      break;
+-    }
+-  }
+-
+-  drmModeFreeResources(resources);
+-  drmModeFreeConnector(connector);
+-  close(fd);
+-
+-  CLog::Log(LOGDEBUG, "AMLUtils::{} - preferred mode: {}", __FUNCTION__, mode);
+-
+-  return mode;
+-}
+-
+-std::string aml_get_preferred_mode(void)
+-{
+-  std::string mode = "";
+-
+-  CSysfsPath cmdline{"/proc/cmdline"};
+-  if (cmdline.Exists())
+-  {
+-    std::vector<std::string> cmdlinestr = StringUtils::Split(cmdline.Get<std::string>().value(), " ");
+-
+-    for (std::vector<std::string>::const_iterator item = cmdlinestr.end(); item != cmdlinestr.begin(); --item)
+-    {
+-      std::vector<std::string> itemstr = StringUtils::Split(*item, "=");
+-      if (itemstr.size() == 2)
+-      {
+-        std::string key = itemstr.front();
+-        std::string value = itemstr.back();
+-        if (StringUtils::EqualsNoCase(key, "vout"))
+-        {
+-          std::vector<std::string> vout = StringUtils::Split(value, ",");
+-          if (vout.size() > 0)
+-          {
+-            mode.assign(vout.front());
+-            break;
+-          }
+-        }
+-      }
+-    }
+-  }
+-
+-  if (mode.empty())
+-    mode = aml_get_drmDevice_preferred_mode();
+-
+-  CLog::Log(LOGDEBUG, "AMLUtils::{} - preferred mode: {}", __FUNCTION__, mode);
+-
+-  return mode;
+-}
+-
+-bool aml_set_hotplug_mode(std::string mode)
+-{
+-  std::string current_mode = aml_get_drmDevice_mode();
+-  bool ret = false;
+-  int res;
+-
+-  int fd = aml_get_drmDevice();
+-  drmModeResPtr resources = NULL;
+-  drmModeConnectorPtr connector = NULL;
+-  drmModeCrtcPtr crtc = NULL;
+-  drmModeModeInfoPtr drmDevicemode = NULL;
+-
+-  CLog::Log(LOGDEBUG, "AMLUtils::{} - current mode: {}, new mode: {}", __FUNCTION__,
+-    current_mode, mode);
+-
+-  if (fd < 0)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - could not get drmDevice", __FUNCTION__);
+-    return ret;
+-  }
+-
+-  if (StringUtils::EqualsNoCase(current_mode, mode))
+-  {
+-    CLog::Log(LOGDEBUG, "AMLUtils::{} - hotplug mode already changed: {}", __FUNCTION__, mode);
+-    ret = true;
+-    close(fd);
+-    return ret;
+-  }
+-
+-  res = drmSetClientCap(fd, DRM_CLIENT_CAP_ATOMIC, 1);
+-  if (res)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - failed to set client cap of drmDevice ({:d})", __FUNCTION__, res);
+-    close(fd);
+-    return ret;
+-  }
+-
+-  resources = aml_get_drmDevice_resources(fd);
+-  if (!resources)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - failed to get resources of drmDevice", __FUNCTION__);
+-    close(fd);
+-    return ret;
+-  }
+-
+-  connector = aml_get_drmDevice_connector(fd, resources, NULL);
+-  if (!connector)
+-  {
+-    CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
+-    drmModeFreeResources(resources);
+-    close(fd);
+-    return ret;
+-  }
+-
+-  for (int i = 0; i < connector->count_modes; i++)
+-  {
+-    std::string connector_mode = static_cast<std::string>(connector->modes[i].name);
+-    if (StringUtils::EqualsNoCase(connector_mode, mode))
+-    {
+-      CLog::Log(LOGDEBUG, "AMLUtils::{} - use mode[{:d}]: {}", __FUNCTION__, i, connector_mode);
+-      drmDevicemode = &connector->modes[i];
+-      break;
+-    }
+-  }
+-
+-  if (drmDevicemode != NULL)
+-  {
+-    uint32_t mode_blobid = 0;
+-    drmModeAtomicReqPtr req = drmModeAtomicAlloc();
+-
+-    if (req)
+-    {
+-      crtc = drmModeGetCrtc(fd, resources->crtcs[0]);
+-
+-      set_drmProp(fd, connector->connector_id, "CRTC_ID", DRM_MODE_OBJECT_CONNECTOR, crtc->crtc_id, req);
+-
+-      drmModeCreatePropertyBlob(fd, drmDevicemode, sizeof(*drmDevicemode), &mode_blobid);
+-
+-      set_drmProp(fd, crtc->crtc_id, "MODE_ID", DRM_MODE_OBJECT_CRTC, mode_blobid, req);
+-      set_drmProp(fd, crtc->crtc_id, "ACTIVE", DRM_MODE_OBJECT_CRTC, 1, req);
+-
+-      ret = drmModeAtomicCommit(fd, req, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+-      if (ret)
+-        CLog::Log(LOGDEBUG, "AMLUtils::{} - failed to set drmDevice mode: {}", __FUNCTION__, drmDevicemode->name);
+-
+-      drmModeAtomicFree(req);
+-    }
+-  }
+-
+-  drmModeFreeResources(resources);
+-  drmModeFreeConnector(connector);
+-  close(fd);
+-
+-  CLog::Log(LOGDEBUG, "AMLUtils::{} - reset of drmDevice finished", __FUNCTION__);
+-
+-  return ret;
+-}
+-
+ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string mode,
+   bool force_mode_switch)
+ {
+@@ -1240,7 +959,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+   drmModeConnectorPtr connector = NULL;
+   drmModeEncoderPtr encoder = NULL;
+   drmModeCrtcPtr crtc = NULL;
+-  drmModeConnection connection;
+ 
+   CLog::Log(LOGDEBUG, "AMLUtils::{} - current mode: {}, new mode: {}", __FUNCTION__,
+     current_mode, mode);
+@@ -1259,7 +977,7 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+     return ret;
+   }
+ 
+-  connector = aml_get_drmDevice_connector(fd, resources, &connection);
++  connector = aml_get_drmDevice_connector(fd, resources);
+   if (!connector)
+   {
+     CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
+@@ -1268,16 +986,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+     return ret;
+   }
+ 
+-  if (connection != DRM_MODE_CONNECTED)
+-  {
+-    CLog::Log(LOGWARNING, "AMLUtils::{} - connector of drmDevice is not connected", __FUNCTION__);
+-    ret = true;
+-    drmModeFreeResources(resources);
+-    drmModeFreeConnector(connector);
+-    close(fd);
+-    return ret;
+-  }
+-
+   encoder = aml_get_drmDevice_encoder(fd, resources, connector);
+   if (!encoder)
+   {
+@@ -1400,27 +1108,21 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
+     if (((StringUtils::StartsWith(i->c_str(), "4k2k")) && (aml_support_h264_4k2k() > AML_NO_H264_4K2K)) || !(StringUtils::StartsWith(i->c_str(), "4k2k")))
+     {
+       if (aml_mode_to_resolution(i->c_str(), &res))
+-      {
+-        // skip 'dummy_l' resolution when HDMI is connected
+-        if (StringUtils::EqualsNoCase(i->c_str(), "dummy_l") && resolutions.size() > 0)
+-          continue;
+-        else
+-          resolutions.push_back(res);
++        resolutions.push_back(res);
+ 
+-        if (aml_has_frac_rate_policy())
++      if (aml_has_frac_rate_policy())
++      {
++        // Add fractional frame rates: 23.976, 29.97 and 59.94 Hz
++        switch ((int)res.fRefreshRate)
+         {
+-          // Add fractional frame rates: 23.976, 29.97 and 59.94 Hz
+-          switch ((int)res.fRefreshRate)
+-          {
+-            case 24:
+-            case 30:
+-            case 60:
+-              res.fRefreshRate /= 1.001f;
+-              res.strMode       = StringUtils::Format("{:d}x{:d} @ {:.2f}{} - Full Screen", res.iScreenWidth, res.iScreenHeight, res.fRefreshRate,
+-                res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "");
+-              resolutions.push_back(res);
+-              break;
+-          }
++          case 24:
++          case 30:
++          case 60:
++            res.fRefreshRate /= 1.001f;
++            res.strMode       = StringUtils::Format("{:d}x{:d} @ {:.2f}{} - Full Screen", res.iScreenWidth, res.iScreenHeight, res.fRefreshRate,
++              res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "");
++            resolutions.push_back(res);
++            break;
+         }
+       }
+     }
+diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
+index 7a43922c11..7e06f9e031 100644
+--- a/xbmc/utils/AMLUtils.h
++++ b/xbmc/utils/AMLUtils.h
+@@ -96,7 +96,3 @@ bool aml_unset_reg_ignore_alpha();
+ 
+ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int value);
+ int aml_get_drmProperty(std::string name, unsigned int obj_type);
+-
+-int aml_get_drmDevice_modes_count(drmModeConnection *connection);
+-std::string aml_get_preferred_mode(void);
+-bool aml_set_hotplug_mode(std::string mode);
+diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
+index 49b826b8b1..287cabdb44 100644
+--- a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
++++ b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
+@@ -20,7 +20,6 @@
+ #include "windowing/GraphicContext.h"
+ #include "windowing/Resolution.h"
+ #include "platform/linux/powermanagement/LinuxPowerSyscall.h"
+-#include "platform/linux/FDEventMonitor.h"
+ #include "platform/linux/ScreenshotSurfaceAML.h"
+ #include "settings/DisplaySettings.h"
+ #include "settings/Settings.h"
+@@ -38,8 +37,6 @@
+ 
+ #include <linux/fb.h>
+ #include <linux/version.h>
+-#include <poll.h>
+-#include <unistd.h>
+ 
+ #include "system_egl.h"
+ 
+@@ -49,9 +46,6 @@ CWinSystemAmlogic::CWinSystemAmlogic()
+ :  m_nativeWindow(NULL)
+ ,  m_libinput(new CLibInputHandler)
+ ,  m_force_mode_switch(false)
+-,  m_fdMonitorId(0)
+-,  m_udev(NULL)
+-,  m_udevMonitor(NULL)
+ {
+   const char *env_framebuffer = getenv("FRAMEBUFFER");
+ 
+@@ -72,11 +66,6 @@ CWinSystemAmlogic::CWinSystemAmlogic()
+   m_libinput->Start();
+ }
+ 
+-CWinSystemAmlogic::~CWinSystemAmlogic()
+-{
+-  MonitorStop();
+-}
+-
+ void CWinSystemAmlogic::SettingOptionsComponentsFiller(const SettingConstPtr& setting,
+                                                  std::vector<IntegerSettingOption>& list,
+                                                  int& current,
+@@ -91,105 +80,6 @@ void CWinSystemAmlogic::SettingOptionsComponentsFiller(const SettingConstPtr& se
+     list.emplace_back(g_localizeStrings.Get(14427), AML_DV_PLAYER_LED);
+ }
+ 
+-void CWinSystemAmlogic::MonitorStart()
+-{
+-  int err;
+-
+-  if (!m_udev)
+-  {
+-    m_udev = udev_new();
+-    if (!m_udev)
+-    {
+-      CLog::Log(LOGWARNING, "CWinSystemAmlogic::Start - Unable to open udev handle");
+-      return;
+-    }
+-
+-    m_udevMonitor = udev_monitor_new_from_netlink(m_udev, "udev");
+-    if (!m_udevMonitor)
+-    {
+-      CLog::Log(LOGERROR, "CWinSystemAmlogic::Start - udev_monitor_new_from_netlink() failed");
+-      goto err_unref_udev;
+-    }
+-
+-    err = udev_monitor_filter_add_match_subsystem_devtype(m_udevMonitor, "drm", NULL);
+-    if (err)
+-    {
+-      CLog::Log(LOGERROR, "CWinSystemAmlogic::Start - udev_monitor_filter_add_match_subsystem_devtype() failed");
+-      goto err_unref_monitor;
+-    }
+-
+-    err = udev_monitor_enable_receiving(m_udevMonitor);
+-    if (err)
+-    {
+-      CLog::Log(LOGERROR, "CWinSystemAmlogic::Start - udev_monitor_enable_receiving() failed");
+-      goto err_unref_monitor;
+-    }
+-
+-    const auto eventMonitor = CServiceBroker::GetPlatform().GetService<CFDEventMonitor>();
+-    eventMonitor->AddFD(
+-        CFDEventMonitor::MonitoredFD(udev_monitor_get_fd(m_udevMonitor),
+-                                     POLLIN, FDEventCallback, m_udevMonitor),
+-        m_fdMonitorId);
+-  }
+-
+-  return;
+-
+-err_unref_monitor:
+-  udev_monitor_unref(m_udevMonitor);
+-  m_udevMonitor = NULL;
+-err_unref_udev:
+-  udev_unref(m_udev);
+-  m_udev = NULL;
+-}
+-
+-void CWinSystemAmlogic::MonitorStop()
+-{
+-  if (m_udev)
+-  {
+-    const auto eventMonitor = CServiceBroker::GetPlatform().GetService<CFDEventMonitor>();
+-    eventMonitor->RemoveFD(m_fdMonitorId);
+-
+-    udev_monitor_unref(m_udevMonitor);
+-    m_udevMonitor = NULL;
+-    udev_unref(m_udev);
+-    m_udev = NULL;
+-  }
+-}
+-
+-
+-void CWinSystemAmlogic::HotplugEvent()
+-{
+-  std::string preferred_mode = aml_get_preferred_mode();
+-  CLog::Log(LOGDEBUG, "CWinSystemAmlogic - HotplugEvent, preferred mode: {}", preferred_mode);
+-
+-  if (!preferred_mode.empty())
+-  {
+-    aml_set_hotplug_mode(preferred_mode);
+-
+-    // clear screen by fb blank
+-    usleep(500 * 1000);
+-    CSysfsPath("/sys/class/graphics/fb0/blank", 1);
+-    usleep(500 * 1000);
+-    CSysfsPath("/sys/class/graphics/fb0/blank", 0);
+-  }
+-}
+-
+-void CWinSystemAmlogic::FDEventCallback(int id, int fd, short revents, void *data)
+-{
+-  struct udev_monitor *udevMonitor = (struct udev_monitor *)data;
+-  struct udev_device *device;
+-
+-  while ((device = udev_monitor_receive_device(udevMonitor)) != NULL)
+-  {
+-    const char* action = udev_device_get_action(device);
+-    CLog::Log(LOGDEBUG, "CWinSystemAmlogic - FDEventCallback (\"{}\", \"{}\"), action: {}",
+-      udev_device_get_syspath(device), udev_device_get_devpath(device), action);
+-
+-    if (StringUtils::EqualsNoCase(action, "change"))
+-      HotplugEvent();
+-  }
+-}
+-
+ bool CWinSystemAmlogic::InitWindowSystem()
+ {
+   const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+@@ -284,23 +174,6 @@ bool CWinSystemAmlogic::InitWindowSystem()
+   // Close the OpenVFD splash and switch the display into time mode.
+   CSysfsPath("/tmp/openvfd_service", 0);
+ 
+-  drmModeConnection connection;
+-  int mode_count = aml_get_drmDevice_modes_count(&connection);
+-
+-  if (connection == DRM_MODE_DISCONNECTED)
+-  {
+-    if (mode_count > 1)
+-    {
+-      CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem Looks like display was hotplugged before Kodi start");
+-      HotplugEvent();
+-    }
+-    else if (mode_count == 1)
+-    {
+-      CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem Looks like no display is connected, wait for hotplug");
+-      MonitorStart();
+-    }
+-  }
+-
+   // kill a running animation
+   CLog::Log(LOGDEBUG,"CWinSystemAmlogic: Sending SIGUSR1 to 'splash-image'");
+   std::system("killall -s SIGUSR1 splash-image &> /dev/null");
+diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.h b/xbmc/windowing/amlogic/WinSystemAmlogic.h
+index 0fd7a581f6..d9380a0299 100644
+--- a/xbmc/windowing/amlogic/WinSystemAmlogic.h
++++ b/xbmc/windowing/amlogic/WinSystemAmlogic.h
+@@ -22,7 +22,6 @@ class CWinSystemAmlogic : public CWinSystemBase
+ {
+ public:
+   CWinSystemAmlogic();
+-  virtual ~CWinSystemAmlogic();
+ 
+   bool InitWindowSystem() override;
+   bool DestroyWindowSystem() override;
+@@ -47,9 +46,6 @@ public:
+                                              std::vector<IntegerSettingOption>& list,
+                                              int& current,
+                                              void* data);
+-
+-  void MonitorStart();
+-  void MonitorStop();
+ protected:
+   std::string m_framebuffer_name;
+   EGLDisplay m_nativeDisplay;
+@@ -65,12 +61,4 @@ protected:
+   std::unique_ptr<CLibInputHandler> m_libinput;
+   CHDRCapabilities m_hdr_caps;
+   bool m_force_mode_switch;
+-private:
+-  static void HotplugEvent();
+-  static void FDEventCallback(int id, int fd, short revents, void *data);
+-
+-  int m_fdMonitorId;
+-
+-  struct udev *m_udev;
+-  struct udev_monitor* m_udevMonitor;
+ };
+-- 
+2.47.1
+
