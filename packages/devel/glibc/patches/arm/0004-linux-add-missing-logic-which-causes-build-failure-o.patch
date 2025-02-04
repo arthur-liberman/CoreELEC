@@ -52,7 +52,7 @@ index cc9f695df9..7fd35860ef 100644
  # endif
  #else /* !FSTATAT_USE_STATX  */
 -  /* All kABIs with non-LFS support and with old 32-bit time_t support
--     e.g. arm, csky, i386, hppa, m68k, microblaze, nios2, sh, powerpc32,
+-     e.g. arm, csky, i386, hppa, m68k, microblaze, sh, powerpc32,
 -     and sparc32.  */
    if (fd < 0)
      {
