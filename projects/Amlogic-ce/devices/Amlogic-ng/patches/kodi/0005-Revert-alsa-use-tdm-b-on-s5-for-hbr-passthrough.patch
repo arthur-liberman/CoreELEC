@@ -1,7 +1,7 @@
-From a2936ce58241221830c2a4dbe515b527b07a5b93 Mon Sep 17 00:00:00 2001
+From b3622f8f2d63d0e099757c5bc1da3ec110a312f4 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 04/13] Revert "alsa: use tdm-b on s5 for hbr passthrough"
+Subject: [PATCH 05/14] Revert "alsa: use tdm-b on s5 for hbr passthrough"
 
 This reverts commit 3d3dc28dc33e9f1d93cba843fa30b541e9ec67ef.
 ---
@@ -151,5 +151,5 @@ index 9b5699ec40..fb6b22eb34 100644
          {
            if (device.substr(0, device.find(':')) == "surround71")
 -- 
-2.47.1
+2.48.1
 

@@ -1,7 +1,7 @@
-From de299d1f9eb1340e6662dc126baf393f7a6aba7b Mon Sep 17 00:00:00 2001
+From 6dfc20404e22b56fdf7a120558f1d78121a31eb8 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:07:09 +0200
-Subject: [PATCH 10/13] Revert "AMLUtils: change framebuffer resolution to
+Subject: [PATCH 11/14] Revert "AMLUtils: change framebuffer resolution to
  enforce DRM mode change"
 
 This reverts commit 6ffd1f1240a1d0ed01541b6bfd1861a981a9d8a9.
@@ -25,5 +25,5 @@ index 9d3bad072a..d2866ee45b 100644
    return true;
  }
 -- 
-2.47.1
+2.48.1
 

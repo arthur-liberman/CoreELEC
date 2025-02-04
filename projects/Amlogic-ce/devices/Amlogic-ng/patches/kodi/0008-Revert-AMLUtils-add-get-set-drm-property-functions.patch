@@ -1,7 +1,7 @@
-From f8115f7c3cf3c35f16e1fdfb406582cf88b54bfc Mon Sep 17 00:00:00 2001
+From 84b7aec203171eb82387063efab16edbb118009f Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 07/13] Revert "AMLUtils: add get/set drm property functions"
+Subject: [PATCH 08/14] Revert "AMLUtils: add get/set drm property functions"
 
 This reverts commit 8b6c4a31d60d84d9f3305c44c28842887ca0be0d.
 ---
@@ -259,5 +259,5 @@ index 7e06f9e031..a9416d5e8e 100644
 -void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int value);
 -int aml_get_drmProperty(std::string name, unsigned int obj_type);
 -- 
-2.47.1
+2.48.1
 

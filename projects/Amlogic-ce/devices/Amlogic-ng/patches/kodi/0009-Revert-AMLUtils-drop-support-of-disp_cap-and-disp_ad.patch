@@ -1,7 +1,7 @@
-From e7183da0cd9091ab0f2c3fe3cba83051e4a432eb Mon Sep 17 00:00:00 2001
+From 861f67d93fcc01a1498b61820f08da382c58526a Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 08/13] Revert "AMLUtils: drop support of 'disp_cap' and
+Subject: [PATCH 09/14] Revert "AMLUtils: drop support of 'disp_cap' and
  'disp_add'"
 
 This reverts commit 8fb5d00288229fbe6985f9cd1fce73b576c8a069.
@@ -60,5 +60,5 @@ index c1a1dd0911..143778cd5f 100644
    if (aml_display_support_3d())
    {
 -- 
-2.47.1
+2.48.1
 

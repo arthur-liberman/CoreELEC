@@ -1,7 +1,7 @@
-From 3abe60374154dbf5b2861f82a179b2caa5359299 Mon Sep 17 00:00:00 2001
+From 80db68262e88311f9d1ffbd8848e7b5a42b0eb54 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 05/13] Revert "WinSystemAmlogic: add display hotplug feature"
+Subject: [PATCH 06/14] Revert "WinSystemAmlogic: add display hotplug feature"
 
 This reverts commit de81a3dde93e9d641a63d7b7526189599acab4d2.
 ---
@@ -765,5 +765,5 @@ index 0fd7a581f6..d9380a0299 100644
 -  struct udev_monitor* m_udevMonitor;
  };
 -- 
-2.47.1
+2.48.1
 

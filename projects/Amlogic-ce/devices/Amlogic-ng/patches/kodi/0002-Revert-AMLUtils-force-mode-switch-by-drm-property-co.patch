@@ -1,7 +1,7 @@
-From 2d4a7f79ca48578932309bc183755ac58783f917 Mon Sep 17 00:00:00 2001
+From ada691de854c5bc716941878362d742a4a1cf45e Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 01/13] Revert "AMLUtils: force mode switch by drm property
+Subject: [PATCH 02/14] Revert "AMLUtils: force mode switch by drm property
  'color_force'"
 
 This reverts commit 7b09672537df9204d6ab80bdb8d78e6abbe1e7de.
@@ -23,5 +23,5 @@ index 6b79b91095..95630f4666 100644
        ret = drmModeSetCrtc(fd, crtc->crtc_id, drm_fb->fb_id, 0, 0,
          resources->connectors, 1, &connector->modes[i]);
 -- 
-2.47.1
+2.48.1
 

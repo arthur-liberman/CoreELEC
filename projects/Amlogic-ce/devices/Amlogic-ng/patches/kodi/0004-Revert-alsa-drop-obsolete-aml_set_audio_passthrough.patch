@@ -1,7 +1,7 @@
-From 99ae1b0d80a744e3573a86cc09af1065e161b83d Mon Sep 17 00:00:00 2001
+From bb0fcec154a3071bcaec8fdaf8d039e4dd38df3e Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 03/13] Revert "alsa: drop obsolete
+Subject: [PATCH 04/14] Revert "alsa: drop obsolete
  'aml_set_audio_passthrough'"
 
 This reverts commit 6074987208e5fdbe186aeeff42a4b93e65f93d36.
@@ -52,5 +52,5 @@ index 473ccf6f76..7a43922c11 100644
  bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res);
  bool aml_get_native_resolution(RESOLUTION_INFO *res);
 -- 
-2.47.1
+2.48.1
 

@@ -1,0 +1,183 @@
+From 03300c240897b655ebf96971e5b2f82b254b5799 Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Wed, 5 Feb 2025 00:51:31 +0200
+Subject: [PATCH 01/14] Revert "Do handle frac rate policy by DRM property"
+
+This reverts commit 6d3f638dea00ba170e05637fc3aa10ae5466cef6.
+---
+ xbmc/guilib/guiinfo/PlayerGUIInfo.cpp         |  8 ++-
+ xbmc/utils/AMLUtils.cpp                       | 64 ++++++++++++++-----
+ xbmc/utils/AMLUtils.h                         |  1 +
+ .../amlogic/WinSystemAmlogicGLESContext.cpp   | 11 +++-
+ 4 files changed, 63 insertions(+), 21 deletions(-)
+
+diff --git a/xbmc/guilib/guiinfo/PlayerGUIInfo.cpp b/xbmc/guilib/guiinfo/PlayerGUIInfo.cpp
+index 483c0a0013..c2bfdc0729 100644
+--- a/xbmc/guilib/guiinfo/PlayerGUIInfo.cpp
++++ b/xbmc/guilib/guiinfo/PlayerGUIInfo.cpp
+@@ -26,7 +26,6 @@
+ #include "guilib/guiinfo/GUIInfo.h"
+ #include "guilib/guiinfo/GUIInfoHelper.h"
+ #include "guilib/guiinfo/GUIInfoLabels.h"
+-#include "utils/AMLUtils.h"
+ #include "utils/StringUtils.h"
+ #include "utils/URIUtils.h"
+ #include "utils/Variant.h"
+@@ -81,9 +80,14 @@ std::string CPlayerGUIInfo::GetAMLConfigInfo(std::string item) const
+ 
+           if (sub_items.size() > 1)
+           {
++            int cur_fractional_rate = 0;
+             item_value = StringUtils::Left(sub_items.at(1), sub_items.at(1).length() - 4) + " ";
+ 
+-            if (aml_get_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR))
++            CSysfsPath frac_rate_policy{"/sys/class/amhdmitx/amhdmitx0/frac_rate_policy"};
++            if (frac_rate_policy.Exists())
++              cur_fractional_rate = frac_rate_policy.Get<int>().value();
++
++            if (cur_fractional_rate)
+             {
+               float refreshrate = static_cast<float>(atof(StringUtils::Mid(sub_items.at(1), sub_items.at(1).length() - 4, 2).c_str()));
+               item_value += fmt::format("{:.2f}", refreshrate / 1.001f) + "Hz";
+diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
+index dbc24f8f8f..6b79b91095 100644
+--- a/xbmc/utils/AMLUtils.cpp
++++ b/xbmc/utils/AMLUtils.cpp
+@@ -274,6 +274,19 @@ bool aml_dolby_vision_enabled()
+   return ((dv_enabled && !!dv_user_enabled) == 1);
+ }
+ 
++bool aml_has_frac_rate_policy()
++{
++  static int has_frac_rate_policy = -1;
++
++  if (has_frac_rate_policy == -1)
++  {
++    CSysfsPath amhdmitx0_frac_rate_policy{"/sys/class/amhdmitx/amhdmitx0/frac_rate_policy"};
++    has_frac_rate_policy = static_cast<int>(amhdmitx0_frac_rate_policy.Exists());
++  }
++
++  return (has_frac_rate_policy == 1);
++}
++
+ bool aml_video_started()
+ {
+   CSysfsPath videostarted{"/sys/class/tsync/videostarted"};
+@@ -1343,8 +1356,15 @@ bool aml_get_native_resolution(RESOLUTION_INFO *res)
+   std::string mode = aml_get_drmDevice_mode();
+   bool result = aml_mode_to_resolution(mode.c_str(), res);
+ 
+-  if (aml_get_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR) == 1)
+-    res->fRefreshRate /= 1.001f;
++  if (aml_has_frac_rate_policy())
++  {
++    int fractional_rate = 0;
++    CSysfsPath frac_rate_policy{"/sys/class/amhdmitx/amhdmitx0/frac_rate_policy"};
++    if (frac_rate_policy.Exists())
++      fractional_rate = frac_rate_policy.Get<int>().value();
++    if (fractional_rate == 1)
++      res->fRefreshRate /= 1.001f;
++  }
+ 
+   return result;
+ }
+@@ -1412,17 +1432,20 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
+         else
+           resolutions.push_back(res);
+ 
+-        // Add fractional frame rates: 23.976, 29.97 and 59.94 Hz
+-        switch ((int)res.fRefreshRate)
++        if (aml_has_frac_rate_policy())
+         {
+-          case 24:
+-          case 30:
+-          case 60:
+-            res.fRefreshRate /= 1.001f;
+-            res.strMode       = StringUtils::Format("{:d}x{:d} @ {:.2f}{} - Full Screen", res.iScreenWidth, res.iScreenHeight, res.fRefreshRate,
+-              res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "");
+-            resolutions.push_back(res);
+-            break;
++          // Add fractional frame rates: 23.976, 29.97 and 59.94 Hz
++          switch ((int)res.fRefreshRate)
++          {
++            case 24:
++            case 30:
++            case 60:
++              res.fRefreshRate /= 1.001f;
++              res.strMode       = StringUtils::Format("{:d}x{:d} @ {:.2f}{} - Full Screen", res.iScreenWidth, res.iScreenHeight, res.fRefreshRate,
++                res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "");
++              resolutions.push_back(res);
++              break;
++          }
+         }
+       }
+     }
+@@ -1466,12 +1489,19 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
+     mode = "custombuilt";
+   }
+ 
+-  int fractional_rate = (res.fRefreshRate == floor(res.fRefreshRate)) ? 0 : 1;
+-
+-  if (aml_get_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR) != fractional_rate)
++  if (aml_has_frac_rate_policy())
+   {
+-    aml_set_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR, fractional_rate);
+-    force_mode_switch = false;
++    int cur_fractional_rate;
++    int fractional_rate = (res.fRefreshRate == floor(res.fRefreshRate)) ? 0 : 1;
++    CSysfsPath amhdmitx0_frac_rate_policy{"/sys/class/amhdmitx/amhdmitx0/frac_rate_policy"};
++    if (amhdmitx0_frac_rate_policy.Exists())
++      cur_fractional_rate = amhdmitx0_frac_rate_policy.Get<int>().value();
++
++    if ((cur_fractional_rate != fractional_rate) || force_mode_switch)
++    {
++      if (amhdmitx0_frac_rate_policy.Exists())
++        amhdmitx0_frac_rate_policy.Set(fractional_rate);
++    }
+   }
+ 
+   aml_set_framebuffer_resolution(res.iScreenWidth, res.iScreenHeight, framebuffer_name);
+diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
+index f5d3789b26..a8b9bfae1c 100644
+--- a/xbmc/utils/AMLUtils.h
++++ b/xbmc/utils/AMLUtils.h
+@@ -80,6 +80,7 @@ bool aml_support_avs2();
+ bool aml_support_avs3();
+ bool aml_support_dolby_vision();
+ bool aml_dolby_vision_enabled();
++bool aml_has_frac_rate_policy();
+ bool aml_video_started();
+ void aml_video_mute(bool mute);
+ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int view_mode);
+diff --git a/xbmc/windowing/amlogic/WinSystemAmlogicGLESContext.cpp b/xbmc/windowing/amlogic/WinSystemAmlogicGLESContext.cpp
+index 6ecc5aa6e6..529c856683 100644
+--- a/xbmc/windowing/amlogic/WinSystemAmlogicGLESContext.cpp
++++ b/xbmc/windowing/amlogic/WinSystemAmlogicGLESContext.cpp
+@@ -78,7 +78,12 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
+ 
+   // check for frac_rate_policy change
+   int fractional_rate = (res.fRefreshRate == floor(res.fRefreshRate)) ? 0 : 1;
+-  int cur_fractional_rate = aml_get_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR);
++  int cur_fractional_rate = fractional_rate;
++  if (aml_has_frac_rate_policy())
++  {
++    CSysfsPath amhdmitx0_frac_rate_policy{"/sys/class/amhdmitx/amhdmitx0/frac_rate_policy"};
++    cur_fractional_rate = amhdmitx0_frac_rate_policy.Get<int>().value();
++  }
+ 
+   StreamHdrType hdrType = CServiceBroker::GetWinSystem()->GetGfxContext().GetHDRType();
+   bool force_mode_switch_by_dv = false;
+@@ -133,7 +138,9 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
+   // check if a forced mode switch is required
+   if (((current_resolution.iWidth == res.iWidth && current_resolution.iHeight == res.iHeight &&
+         current_resolution.iScreenWidth == res.iScreenWidth && current_resolution.iScreenHeight == res.iScreenHeight &&
+-        current_resolution.fRefreshRate == res.fRefreshRate) && force_mode_switch_by_dv) ||
++        current_resolution.fRefreshRate == res.fRefreshRate) &&
++       (force_mode_switch_by_dv ||
++       (fractional_rate != cur_fractional_rate))) ||
+        (m_stereo_mode != stereo_mode))
+   {
+     m_force_mode_switch = true;
+-- 
+2.48.1
+

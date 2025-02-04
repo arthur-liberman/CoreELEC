@@ -1,7 +1,7 @@
-From 4daec4d5ab80709bf8e8b2ffc72dca32f9ec23fb Mon Sep 17 00:00:00 2001
+From 27f5b62783c5b2f884b8c45bf937a375180f730c Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 01:41:54 +0200
-Subject: [PATCH 12/13] alsa: fix soc name for linux 4.9
+Subject: [PATCH 13/14] alsa: fix soc name for linux 4.9
 
 ---
  xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp | 2 +-
@@ -21,5 +21,5 @@ index e137df228e..9316af4da6 100644
            if (!elem) {
              CLog::Log(LOGERROR, "CAESinkALSA - Unable to find simple control '{}',{:d}\n",
 -- 
-2.47.1
+2.48.1
 

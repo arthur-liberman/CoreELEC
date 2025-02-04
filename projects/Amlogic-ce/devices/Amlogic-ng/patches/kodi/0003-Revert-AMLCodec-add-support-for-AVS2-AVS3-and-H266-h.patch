@@ -1,7 +1,7 @@
-From d2e1ea05716a8ffb86f947b9139dba9da1a89625 Mon Sep 17 00:00:00 2001
+From bb392d82b7a9d19adec993ce3f0a8bf40d18c382 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 02/13] Revert "AMLCodec: add support for AVS2, AVS3 and H266
+Subject: [PATCH 03/14] Revert "AMLCodec: add support for AVS2, AVS3 and H266
  hardware decoder"
 
 This reverts commit 01cbab691387b6894283189aff8265d367f19f32.
@@ -13,7 +13,7 @@ This reverts commit 01cbab691387b6894283189aff8265d367f19f32.
  4 files changed, 84 deletions(-)
 
 diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
-index f0f487b5cf..931fd2a687 100644
+index e73ab0218b..863b6f50d1 100644
 --- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
 +++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
 @@ -432,18 +432,9 @@ static vformat_t codecid_to_vformat(enum AVCodecID id)
@@ -58,9 +58,9 @@ index f0f487b5cf..931fd2a687 100644
      default:
        dec_type = VIDEO_DEC_FORMAT_UNKNOW;
        break;
-@@ -2129,12 +2108,6 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
-       if (m_hints.ptsinvalid)
-         am_private->gcodec.param = (void*)(EXTERNAL_PTS | SYNC_OUTSIDE);
+@@ -2133,12 +2112,6 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+       else
+         CSysfsPath("/sys/module/amvdec_h265/parameters/nal_skip_policy", 2);
        break;
 -    case VFORMAT_H266:
 -      am_private->gcodec.format = VIDEO_DEC_FORMAT_H266;
@@ -179,5 +179,5 @@ index a8b9bfae1c..473ccf6f76 100644
  bool aml_dolby_vision_enabled();
  bool aml_has_frac_rate_policy();
 -- 
-2.47.1
+2.48.1
 
