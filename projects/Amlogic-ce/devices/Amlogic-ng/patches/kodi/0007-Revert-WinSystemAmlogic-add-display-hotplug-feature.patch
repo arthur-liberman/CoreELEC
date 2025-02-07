@@ -1,7 +1,7 @@
-From 80db68262e88311f9d1ffbd8848e7b5a42b0eb54 Mon Sep 17 00:00:00 2001
+From 7751fbd54a6614c8e2ab0075da208ae877b76d60 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 06/14] Revert "WinSystemAmlogic: add display hotplug feature"
+Subject: [PATCH 07/15] Revert "WinSystemAmlogic: add display hotplug feature"
 
 This reverts commit de81a3dde93e9d641a63d7b7526189599acab4d2.
 ---
@@ -26,7 +26,7 @@ index 640769f9ad..aa27708566 100644
      std::ofstream ofs(aml_res_path + "/" + aml_res_file, std::ofstream::out);
      ofs << "# WARNING DO NOT MODIFY THIS FILE! ALL CHANGES WILL BE LOST!\n";
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index f8c1513003..513f899eaf 100644
+index c354a0bd57..815d7fd596 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -426,13 +426,6 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
@@ -503,7 +503,7 @@ index f8c1513003..513f899eaf 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -1400,27 +1108,21 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
+@@ -1408,27 +1116,21 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
      if (((StringUtils::StartsWith(i->c_str(), "4k2k")) && (aml_support_h264_4k2k() > AML_NO_H264_4K2K)) || !(StringUtils::StartsWith(i->c_str(), "4k2k")))
      {
        if (aml_mode_to_resolution(i->c_str(), &res))

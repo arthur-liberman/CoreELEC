@@ -1,7 +1,7 @@
-From bb0fcec154a3071bcaec8fdaf8d039e4dd38df3e Mon Sep 17 00:00:00 2001
+From 5f7efc297fbcfee3878ab41c47a48ff8d10c15a6 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 04/14] Revert "alsa: drop obsolete
+Subject: [PATCH 05/15] Revert "alsa: drop obsolete
  'aml_set_audio_passthrough'"
 
 This reverts commit 6074987208e5fdbe186aeeff42a4b93e65f93d36.
@@ -24,7 +24,7 @@ index 2ec145c19d..9b5699ec40 100644
    }
  
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 589ce6a405..f8c1513003 100644
+index f7f99c9305..c354a0bd57 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -275,6 +275,11 @@ void aml_video_mute(bool mute)
