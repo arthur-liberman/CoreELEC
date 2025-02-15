@@ -12,10 +12,16 @@ PKG_LONGDESC="OpenGL ES pre-compiled libraries for Mali GPUs found in Amlogic Me
 PKG_TOOLCHAIN="manual"
 
 makeinstall_target() {
+  if [ "${ARCH}" = "aarch64" ]; then
+    LIB_ARCH="arm64"
+  else
+    LIB_ARCH="eabihf"
+  fi
+
   mkdir -p ${INSTALL}/usr/lib
-    cp -p lib/eabihf/gondul/r12p0/fbdev/libMali.so ${INSTALL}/usr/lib/libMali.gondul.so
-    cp -p lib/eabihf/dvalin/r12p0/fbdev/libMali.so ${INSTALL}/usr/lib/libMali.dvalin.so
-    cp -p lib/eabihf/m450/r7p0/fbdev/libMali.so ${INSTALL}/usr/lib/libMali.m450.so
+    cp -p lib/${LIB_ARCH}/gondul/r12p0/fbdev/libMali.so ${INSTALL}/usr/lib/libMali.gondul.so
+    cp -p lib/${LIB_ARCH}/dvalin/r12p0/fbdev/libMali.so ${INSTALL}/usr/lib/libMali.dvalin.so
+    cp -p lib/${LIB_ARCH}/m450/r7p0/fbdev/libMali.so ${INSTALL}/usr/lib/libMali.m450.so
 
     ln -sf /var/lib/libMali.so ${INSTALL}/usr/lib/libMali.so
 

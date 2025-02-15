@@ -27,7 +27,7 @@ DISTRO="${DISTRO:-CoreELEC}"
 export PROJECT="${PROJECT:-Amlogic-ce}"
 
 # determines DEVICE, if not forced by user
-export DEVICE="${DEVICE:-Amlogic-no}"
+export DEVICE="${DEVICE:-Amlogic-ng}"
 
 # default to Generic device if building Generic project without device set
 if [ "${PROJECT}" = "Generic" -a -z "${DEVICE}" ]; then
@@ -36,9 +36,6 @@ fi
 
 # determines TARGET_ARCH, if not forced by user
 export ARCH="${ARCH:-aarch64}"
-
-# set default arch for ng device
-[[ "${DEVICE}" = "Amlogic-ng"* ]] && ARCH=arm
 
 TARGET_ARCH="${ARCH}"
 

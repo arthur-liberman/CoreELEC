@@ -12,6 +12,9 @@ PKG_DEPENDS_TARGET="toolchain bl301_xxxxxx bl301_221119 bl301_091020"
 PKG_LONGDESC="Tool to inject bootloader blob BL301.bin on internal eMMC"
 PKG_TOOLCHAIN="manual"
 
+if [ "${ARCH}" = "aarch64" ]; then
+  PKG_SHA256="607be0ec8e0d931803a3c452bae6beccaedb443a1f51177981e14d792c435778"
+fi
 pre_make_target() {
   cp -av ${PKG_DIR}/config/bl301.conf ${PKG_BUILD}/bl301.conf
   for PKG_DEPEND_TARGET in ${PKG_DEPENDS_TARGET}; do
