@@ -1,0 +1,173 @@
+From 08e7969e9a077c490aa304fc62cd431be87d4744 Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Wed, 19 Feb 2025 00:08:51 +0200
+Subject: [PATCH 02/17] Revert "Drop GUI scaling"
+
+This reverts commit 8dda3939a6cc3ef04c3554bb63145df99f904493.
+---
+ addons/resource.language.en_gb/resources/strings.po | 10 ++++++++++
+ system/settings/settings.xml                        |  5 +++++
+ xbmc/settings/DisplaySettings.cpp                   |  5 ++++-
+ xbmc/settings/Settings.cpp                          |  1 +
+ xbmc/settings/Settings.h                            |  1 +
+ xbmc/utils/AMLUtils.cpp                             |  9 +++++----
+ xbmc/windowing/amlogic/WinSystemAmlogic.cpp         | 11 +++++++++++
+ 7 files changed, 37 insertions(+), 5 deletions(-)
+
+diff --git a/addons/resource.language.en_gb/resources/strings.po b/addons/resource.language.en_gb/resources/strings.po
+index 10b8c21c1b..5d9b663ce1 100644
+--- a/addons/resource.language.en_gb/resources/strings.po
++++ b/addons/resource.language.en_gb/resources/strings.po
+@@ -8966,6 +8966,16 @@ msgctxt "#14411"
+ msgid "Force colour subsampling to set value. Requires resolution change to get active."
+ msgstr ""
+ 
++#: system/settings/settings.xml
++msgctxt "#14412"
++msgid "Disable GUI scaling"
++msgstr ""
++
++#: system/settings/settings.xml
++msgctxt "#14413"
++msgid "For optimal performance across all devices, the GUI is rendered at 1080P and scaled to 4K by default, this option disables that scaling and renders the GUI at 4K. This can make thumbnails and other textures sharper, however some devices may have issues with this option being set. Requires reboot."
++msgstr ""
++
+ #. Force colour subsampling
+ #: system/settings/settings.xml
+ msgctxt "#14414"
+diff --git a/system/settings/settings.xml b/system/settings/settings.xml
+index b44db9aafb..6b80ee32f9 100755
+--- a/system/settings/settings.xml
++++ b/system/settings/settings.xml
+@@ -2945,6 +2945,11 @@
+           </dependencies>
+           <control type="toggle" />
+         </setting>
++        <setting id="coreelec.amlogic.disableguiscaling" type="boolean" parent="videoscreen.screen" label="14412" help="14413">
++          <requirement>HAVE_4K_GUI</requirement>
++          <default>false</default>
++          <control type="toggle" />
++        </setting>
+         <setting id="coreelec.amlogic.limitcd" type="integer" parent="videoscreen.screen" label="14408" help="14409">
+           <level>3</level>
+           <default>0</default> <!-- Auto -->
+diff --git a/xbmc/settings/DisplaySettings.cpp b/xbmc/settings/DisplaySettings.cpp
+index cbef00b583..640769f9ad 100644
+--- a/xbmc/settings/DisplaySettings.cpp
++++ b/xbmc/settings/DisplaySettings.cpp
+@@ -112,6 +112,7 @@ static bool write_resolution_ini(RESOLUTION_INFO res)
+   std::string force_cs[] = { "rgb", "420", "422", "444" };
+   std::string limit_cd[] = { "8bit", "10bit", "12bit", "16bit" };
+   auto result = statfs(aml_res_path.c_str(), &fsInfo);
++  const bool nativeGui = settings->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING);
+ 
+   if (!result && fsInfo.f_flags & MS_RDONLY)
+     result = mount(NULL, aml_res_path.c_str(), NULL, MS_NOATIME | MS_REMOUNT, NULL);
+@@ -122,6 +123,7 @@ static bool write_resolution_ini(RESOLUTION_INFO res)
+     ofs << "# WARNING DO NOT MODIFY THIS FILE! ALL CHANGES WILL BE LOST!\n";
+     ofs << "kernel_hdmimode=" << res.strId.c_str() << "\n";
+     ofs << "frac_rate_policy=" << std::to_string((res.fRefreshRate == floor(res.fRefreshRate)) ? 0 : 1).c_str() << "\n";
++    ofs << "native_4k_gui=" << std::to_string(nativeGui).c_str() << "\n";
+     ofs << "hdmitx=";
+     if (settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS) > 0)
+       fmt_attr += std::string(force_cs[settings->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS) - 1] + ",").c_str();
+@@ -411,7 +413,8 @@ bool CDisplaySettings::OnSettingChanging(const std::shared_ptr<const CSetting>&
+ #endif
+   }
+ #endif
+-  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS ||
++  else if (settingId == CSettings::SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING ||
++    settingId == CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS ||
+     settingId == CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD)
+   {
+     const RESOLUTION_INFO res_info = GetResolutionInfo(GetCurrentResolution());
+diff --git a/xbmc/settings/Settings.cpp b/xbmc/settings/Settings.cpp
+index 6b176c55b7..3e76afc9fb 100644
+--- a/xbmc/settings/Settings.cpp
++++ b/xbmc/settings/Settings.cpp
+@@ -570,6 +570,7 @@ void CSettings::InitializeISettingCallbacks()
+   settingSet.insert(CSettings::SETTING_VIDEOSCREEN_SCREEN);
+   settingSet.insert(CSettings::SETTING_VIDEOSCREEN_RESOLUTION);
+   settingSet.insert(CSettings::SETTING_VIDEOSCREEN_SCREENMODE);
++  settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING);
+   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_FORCE_CS);
+   settingSet.insert(CSettings::SETTING_COREELEC_AMLOGIC_LIMIT_CD);
+   settingSet.insert(CSettings::SETTING_VIDEOSCREEN_MONITOR);
+diff --git a/xbmc/settings/Settings.h b/xbmc/settings/Settings.h
+index 1651165da2..023316dc4c 100644
+--- a/xbmc/settings/Settings.h
++++ b/xbmc/settings/Settings.h
+@@ -466,6 +466,7 @@ public:
+   static constexpr auto SETTING_COREELEC_AMLOGIC_HDR2SDR = "coreelec.amlogic.hdr2sdr";
+   static constexpr auto SETTING_COREELEC_AMLOGIC_LIMIT_CD = "coreelec.amlogic.limitcd";
+   static constexpr auto SETTING_COREELEC_AMLOGIC_FORCE_CS = "coreelec.amlogic.forcecs";
++  static constexpr auto SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING = "coreelec.amlogic.disableguiscaling";
+   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_DISABLE = "coreelec.amlogic.disabledolbyvision";
+   static constexpr auto SETTING_COREELEC_AMLOGIC_DV_LED = "coreelec.amlogic.dolbyvisionled";
+   static constexpr auto SETTING_CACHE_HARDDISK = "cache.harddisk";
+diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
+index 6a53c0e54d..b5b314c22a 100644
+--- a/xbmc/utils/AMLUtils.cpp
++++ b/xbmc/utils/AMLUtils.cpp
+@@ -381,6 +381,7 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+   if(!mode)
+     return false;
+ 
++  const bool nativeGui = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING);
+   std::string fromMode = mode;
+   StringUtils::Trim(fromMode);
+   // strips, for example, 720p* to 720p
+@@ -390,8 +391,8 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+ 
+   if (StringUtils::EqualsNoCase(fromMode, "4k2ksmpte") || StringUtils::EqualsNoCase(fromMode, "smpte24hz"))
+   {
+-    res->iWidth = 4096;
+-    res->iHeight= 2160;
++    res->iWidth = nativeGui ? 4096 : 1920;
++    res->iHeight= nativeGui ? 2160 : 1080;
+     res->iScreenWidth = 4096;
+     res->iScreenHeight= 2160;
+     res->fRefreshRate = 24;
+@@ -449,8 +450,8 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+       return false;
+     }
+ 
+-    res->iWidth = width;
+-    res->iHeight= height;
++    res->iWidth = nativeGui ? width : std::min(width, 1920);
++    res->iHeight= nativeGui ? height : std::min(height, 1080);
+     res->iScreenWidth = width;
+     res->iScreenHeight = height;
+     res->dwFlags = (*smode == 'p') ? D3DPRESENTFLAG_PROGRESSIVE : D3DPRESENTFLAG_INTERLACED;
+diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
+index 9c4822f80a..49b826b8b1 100644
+--- a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
++++ b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
+@@ -37,6 +37,7 @@
+ #include "platform/linux/SysfsPath.h"
+ 
+ #include <linux/fb.h>
++#include <linux/version.h>
+ #include <poll.h>
+ #include <unistd.h>
+ 
+@@ -251,6 +252,16 @@ bool CWinSystemAmlogic::InitWindowSystem()
+       settings->SetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LED, new_value);
+   }
+ 
++  if (((LINUX_VERSION_CODE >> 16) & 0xFF) < 5)
++  {
++    auto setting = settings->GetSetting(CSettings::SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING);
++    if (setting)
++    {
++      setting->SetVisible(false);
++      settings->SetBool(CSettings::SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING, false);
++    }
++  }
++
+   m_nativeDisplay = EGL_DEFAULT_DISPLAY;
+ 
+   CDVDVideoCodecAmlogic::Register();
+-- 
+2.48.1
+

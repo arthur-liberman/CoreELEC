@@ -1,7 +1,7 @@
-From 66ea8ba49fd87469d23e0dfdecd0d9c070b18c89 Mon Sep 17 00:00:00 2001
+From 987b0b7c228642d6c172c3b2335a107ef6c212b8 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Wed, 5 Feb 2025 00:51:31 +0200
-Subject: [PATCH 02/15] Revert "Do handle frac rate policy by DRM property"
+Subject: [PATCH 04/17] Revert "Do handle frac rate policy by DRM property"
 
 This reverts commit 6d3f638dea00ba170e05637fc3aa10ae5466cef6.
 ---
@@ -40,7 +40,7 @@ index 483c0a0013..c2bfdc0729 100644
                float refreshrate = static_cast<float>(atof(StringUtils::Mid(sub_items.at(1), sub_items.at(1).length() - 4, 2).c_str()));
                item_value += fmt::format("{:.2f}", refreshrate / 1.001f) + "Hz";
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 195a509634..2001059f8c 100644
+index f95f718b42..12052c7273 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -274,6 +274,19 @@ bool aml_dolby_vision_enabled()
@@ -63,7 +63,7 @@ index 195a509634..2001059f8c 100644
  bool aml_video_started()
  {
    CSysfsPath videostarted{"/sys/class/tsync/videostarted"};
-@@ -1343,8 +1356,15 @@ bool aml_get_native_resolution(RESOLUTION_INFO *res)
+@@ -1346,8 +1359,15 @@ bool aml_get_native_resolution(RESOLUTION_INFO *res)
    std::string mode = aml_get_drmDevice_mode();
    bool result = aml_mode_to_resolution(mode.c_str(), res);
  
@@ -81,7 +81,7 @@ index 195a509634..2001059f8c 100644
  
    return result;
  }
-@@ -1420,17 +1440,20 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
+@@ -1428,17 +1448,20 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
          else
            resolutions.push_back(res);
  
@@ -112,7 +112,7 @@ index 195a509634..2001059f8c 100644
          }
        }
      }
-@@ -1474,12 +1497,19 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
+@@ -1482,12 +1505,19 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
      mode = "custombuilt";
    }
  

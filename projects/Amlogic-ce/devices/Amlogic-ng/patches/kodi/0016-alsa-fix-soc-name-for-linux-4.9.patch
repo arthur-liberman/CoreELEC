@@ -1,7 +1,7 @@
-From a99fc3ca056accb3ca07770f70270983f2e0a7df Mon Sep 17 00:00:00 2001
+From eacf70f54d9f45ca084e3cdfb390f13d059a1d3c Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 01:41:54 +0200
-Subject: [PATCH 14/15] alsa: fix soc name for linux 4.9
+Subject: [PATCH 16/17] alsa: fix soc name for linux 4.9
 
 ---
  xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp | 2 +-

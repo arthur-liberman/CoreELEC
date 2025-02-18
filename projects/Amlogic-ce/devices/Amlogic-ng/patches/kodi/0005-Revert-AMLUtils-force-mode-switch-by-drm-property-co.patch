@@ -1,7 +1,7 @@
-From 939378d65311032f887994162a3c5729cf2cd15b Mon Sep 17 00:00:00 2001
+From 7afb0b3f496207a4894cdc81671c822c7a1ad4a6 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 03/15] Revert "AMLUtils: force mode switch by drm property
+Subject: [PATCH 05/17] Revert "AMLUtils: force mode switch by drm property
  'color_force'"
 
 This reverts commit 7b09672537df9204d6ab80bdb8d78e6abbe1e7de.
@@ -10,10 +10,10 @@ This reverts commit 7b09672537df9204d6ab80bdb8d78e6abbe1e7de.
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 2001059f8c..aee2191252 100644
+index 12052c7273..65e110b939 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -1332,7 +1332,7 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+@@ -1335,7 +1335,7 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
        drmModeFBPtr drm_fb = drmModeGetFB(fd, crtc->buffer_id);
  
        if (force_mode_switch)

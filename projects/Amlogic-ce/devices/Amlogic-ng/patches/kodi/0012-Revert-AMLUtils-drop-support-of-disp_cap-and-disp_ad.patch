@@ -1,7 +1,7 @@
-From c7d10332cec1fa731555050cd663dbee545f33eb Mon Sep 17 00:00:00 2001
+From 6912e5f9ad88c1e6a9fda19af22773dac8477c1d Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 10/15] Revert "AMLUtils: drop support of 'disp_cap' and
+Subject: [PATCH 12/17] Revert "AMLUtils: drop support of 'disp_cap' and
  'disp_add'"
 
 This reverts commit 8fb5d00288229fbe6985f9cd1fce73b576c8a069.
@@ -10,10 +10,10 @@ This reverts commit 8fb5d00288229fbe6985f9cd1fce73b576c8a069.
  1 file changed, 27 insertions(+), 6 deletions(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index e227e63f10..d83f316cf4 100644
+index 1bddf7c147..31897443b7 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -850,18 +850,39 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
+@@ -858,18 +858,39 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
  {
    std::string valstr, addstr;
  

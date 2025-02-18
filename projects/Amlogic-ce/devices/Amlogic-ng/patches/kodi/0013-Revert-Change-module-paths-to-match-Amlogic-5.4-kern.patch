@@ -1,7 +1,7 @@
-From bd3922338c471c6ebef891c8c91cb8739939af31 Mon Sep 17 00:00:00 2001
+From ce5a13159fd0fdd5350b4e187415a9ea8927607c Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:07:09 +0200
-Subject: [PATCH 11/15] Revert "Change module paths to match Amlogic 5.4
+Subject: [PATCH 13/17] Revert "Change module paths to match Amlogic 5.4
  kernel"
 
 This reverts commit 355ce0a8ead7347c2c92c9a40c0be44305ba86f7.
@@ -34,7 +34,7 @@ index 863b6f50d1..d0dc8ecd6e 100644
    {
      CSysfsPath dv_video_on{"/sys/class/amdolby_vision/dv_video_on"};
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index d83f316cf4..c2f6b36e01 100644
+index 31897443b7..aafe87015d 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -289,7 +289,7 @@ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int vie

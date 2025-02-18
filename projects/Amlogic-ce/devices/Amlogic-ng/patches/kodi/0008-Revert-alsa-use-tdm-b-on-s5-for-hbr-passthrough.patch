@@ -1,7 +1,7 @@
-From 7bc2f44c10d63ec587508094513b10ab52da949d Mon Sep 17 00:00:00 2001
+From 6e01f1ef22eb56001f3c967e629b565e9594036e Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 06/15] Revert "alsa: use tdm-b on s5 for hbr passthrough"
+Subject: [PATCH 08/17] Revert "alsa: use tdm-b on s5 for hbr passthrough"
 
 This reverts commit 3d3dc28dc33e9f1d93cba843fa30b541e9ec67ef.
 ---

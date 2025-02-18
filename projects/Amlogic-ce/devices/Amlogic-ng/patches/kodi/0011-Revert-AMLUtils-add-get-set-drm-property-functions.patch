@@ -1,7 +1,7 @@
-From 833be7aeebb305ceb8fe0a47425b4ff969182464 Mon Sep 17 00:00:00 2001
+From 4e7a50fe216f0bf32ba8dc86253039cae4df4edd Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 09/15] Revert "AMLUtils: add get/set drm property functions"
+Subject: [PATCH 11/17] Revert "AMLUtils: add get/set drm property functions"
 
 This reverts commit 8b6c4a31d60d84d9f3305c44c28842887ca0be0d.
 ---
@@ -10,10 +10,10 @@ This reverts commit 8b6c4a31d60d84d9f3305c44c28842887ca0be0d.
  2 files changed, 230 deletions(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 815d7fd596..e227e63f10 100644
+index 208297fe15..1bddf7c147 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -654,233 +654,6 @@ std::string aml_get_drmDevice_modes(void)
+@@ -657,233 +657,6 @@ std::string aml_get_drmDevice_modes(void)
    return modes;
  }
  
