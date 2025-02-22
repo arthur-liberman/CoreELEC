@@ -1,10 +1,10 @@
-From 635e8e42620999ce63929dc1529b1e0d0401b86a Mon Sep 17 00:00:00 2001
+From c781b2884c9dde0aea49549caf1831123bb8fe8b Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 07/17] Revert "alsa: drop obsolete
+Date: Sat, 15 Mar 2025 01:53:10 +0200
+Subject: [PATCH 09/17] Revert "alsa: drop obsolete
  'aml_set_audio_passthrough'"
 
-This reverts commit 6074987208e5fdbe186aeeff42a4b93e65f93d36.
+This reverts commit eb97f5c837e174b60b86c3d74405ce49400fa2f2.
 ---
  xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp | 1 +
  xbmc/utils/AMLUtils.cpp                     | 5 +++++
@@ -12,10 +12,10 @@ This reverts commit 6074987208e5fdbe186aeeff42a4b93e65f93d36.
  3 files changed, 7 insertions(+)
 
 diff --git a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
-index 2ec145c19d..9b5699ec40 100644
+index 3b0453bfce..e137df228e 100644
 --- a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
 +++ b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
-@@ -818,6 +818,7 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
+@@ -807,6 +807,7 @@ bool CAESinkALSA::Initialize(AEAudioFormat &format, std::string &device)
        }
      }
  
@@ -24,11 +24,11 @@ index 2ec145c19d..9b5699ec40 100644
    }
  
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 35281fc94c..8acb55520a 100644
+index f4beec321a..697ba6b7c6 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -275,6 +275,11 @@ void aml_video_mute(bool mute)
-   }
+@@ -275,6 +275,11 @@ bool aml_convert_to_dv_by_vs_engine(StreamHdrType hdrType)
+   return ((convert_to_dv && !!user_convert_to_dv && !!dv_user_enabled) == 1);
  }
  
 +void aml_set_audio_passthrough(bool passthrough)
@@ -40,13 +40,13 @@ index 35281fc94c..8acb55520a 100644
  {
    int fd;
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index 473ccf6f76..7a43922c11 100644
+index 91534d9402..d369c70f7a 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
-@@ -80,6 +80,7 @@ bool aml_dolby_vision_enabled();
+@@ -80,6 +80,7 @@ bool aml_support_dolby_vision();
+ bool aml_dolby_vision_enabled();
+ bool aml_convert_to_dv_by_vs_engine(StreamHdrType hdrType);
  bool aml_has_frac_rate_policy();
- bool aml_video_started();
- void aml_video_mute(bool mute);
 +void aml_set_audio_passthrough(bool passthrough);
  void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int view_mode);
  bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res);

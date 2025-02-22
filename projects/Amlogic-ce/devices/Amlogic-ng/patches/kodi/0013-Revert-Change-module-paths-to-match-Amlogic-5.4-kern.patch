@@ -1,21 +1,21 @@
-From ce5a13159fd0fdd5350b4e187415a9ea8927607c Mon Sep 17 00:00:00 2001
+From ebcca7a85e99fbd6142b0dbf6b9c89088ac06417 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Thu, 9 Jan 2025 00:07:09 +0200
+Date: Sat, 15 Mar 2025 02:00:33 +0200
 Subject: [PATCH 13/17] Revert "Change module paths to match Amlogic 5.4
  kernel"
 
-This reverts commit 355ce0a8ead7347c2c92c9a40c0be44305ba86f7.
+This reverts commit a3a87c52de5b0830ab71c0fe7b95bf5b0658af99.
 ---
- xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp |  4 ++--
+ xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp | 13 +++++--------
  xbmc/utils/AMLUtils.cpp                             |  2 +-
  xbmc/windowing/amlogic/WinSystemAmlogic.cpp         | 10 +++++-----
- 3 files changed, 8 insertions(+), 8 deletions(-)
+ 3 files changed, 11 insertions(+), 14 deletions(-)
 
 diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
-index 863b6f50d1..d0dc8ecd6e 100644
+index 8bcdfa498e..2f02477700 100644
 --- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
 +++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
-@@ -2015,7 +2015,7 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+@@ -2022,10 +2022,10 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
    if (dv_enable)
    {
      // enable Dolby Vision
@@ -23,18 +23,50 @@ index 863b6f50d1..d0dc8ecd6e 100644
 +    CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", 'Y');
  
      // use player led mode when enabled
-     CSysfsPath dolby_vision_ll_policy{"/sys/module/aml_media/parameters/dolby_vision_ll_policy"};
-@@ -2304,7 +2304,7 @@ void CAMLCodec::CloseDecoder()
-   // return tsync to default so external apps work
-   CSysfsPath("/sys/class/tsync/enable", 1);
-   // disable Dolby Vision driver
+-    CSysfsPath dolby_vision_ll_policy{"/sys/module/aml_media/parameters/dolby_vision_ll_policy"};
++    CSysfsPath dolby_vision_ll_policy{"/sys/module/amdolby_vision/parameters/dolby_vision_ll_policy"};
+     if (dolby_vision_ll_policy.Exists())
+     {
+       if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LED) == AML_DV_PLAYER_LED)
+@@ -2037,7 +2037,7 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+     // setup Dolby Vision VS-Engine for non DV media
+     if (hints.dovi.dv_profile == 0)
+     {
+-      CSysfsPath("/sys/module/aml_media/parameters/dolby_vision_policy", AMDV_FORCE_OUTPUT_MODE);
++      CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_policy", AMDV_FORCE_OUTPUT_MODE);
+       if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LED) == AML_DV_PLAYER_LED)
+         CSysfsPath("/sys/class/amdolby_vision/dv_mode", (AMDV_OUTPUT_MODE_IPT + 1) % 6);
+       else
+@@ -2045,7 +2045,6 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+     }
+     else
+     {
+-      CSysfsPath("/sys/class/amvecm/enable_hdr10plus", 0);
+       am_private->gcodec.dv_enable = 1;
+     }
+ 
+@@ -2301,8 +2300,8 @@ void CAMLCodec::SetVfmMap(const std::string &name, const std::string &map)
+ 
+ void CAMLCodec::CloseDecoder()
+ {
 -  CSysfsPath dolby_vision_enable{"/sys/module/aml_media/parameters/dolby_vision_enable"};
+-  CSysfsPath dolby_vision_policy{"/sys/module/aml_media/parameters/dolby_vision_policy"};
 +  CSysfsPath dolby_vision_enable{"/sys/module/amdolby_vision/parameters/dolby_vision_enable"};
-   if (dolby_vision_enable.Exists() && StringUtils::EqualsNoCase(dolby_vision_enable.Get<std::string>().value(), "Y"))
-   {
-     CSysfsPath dv_video_on{"/sys/class/amdolby_vision/dv_video_on"};
++  CSysfsPath dolby_vision_policy{"/sys/module/amdolby_vision/parameters/dolby_vision_policy"};
+   bool dv_enabled(StringUtils::EqualsNoCase(dolby_vision_enable.Get<std::string>().value(), "Y"));
+   CLog::Log(LOGDEBUG, "CAMLCodec::CloseDecoder");
+ 
+@@ -2342,8 +2341,6 @@ void CAMLCodec::CloseDecoder()
+ 
+     if (dolby_vision_policy.Get<int>().value() == AMDV_FORCE_OUTPUT_MODE)
+       dolby_vision_policy.Set(AMDV_FOLLOW_SOURCE);
+-    else
+-      CSysfsPath("/sys/class/amvecm/enable_hdr10plus", 1);
+ 
+     dolby_vision_enable.Set('N');
+   }
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 31897443b7..aafe87015d 100644
+index ed3f08a2ca..10df4fbb7a 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -289,7 +289,7 @@ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int vie
@@ -47,7 +79,7 @@ index 31897443b7..aafe87015d 100644
    }
  }
 diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
-index 287cabdb44..5191c20129 100644
+index 5f1fc89da0..dce1e4dc4c 100644
 --- a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
 +++ b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
 @@ -87,23 +87,23 @@ bool CWinSystemAmlogic::InitWindowSystem()

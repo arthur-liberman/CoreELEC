@@ -1,10 +1,10 @@
-From bbcb123422ac7f406fce31761fe2409722ed6d9f Mon Sep 17 00:00:00 2001
+From f360ebe2be0866402580c78c97c369c4ac9fc9a1 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 06/17] Revert "AMLCodec: add support for AVS2, AVS3 and H266
+Date: Sat, 15 Mar 2025 01:52:22 +0200
+Subject: [PATCH 05/17] Revert "AMLCodec: add support for AVS2, AVS3 and H266
  hardware decoder"
 
-This reverts commit 01cbab691387b6894283189aff8265d367f19f32.
+This reverts commit 8ef4e4930c8038019151c4476dac571c2dee4de6.
 ---
  .../VideoPlayer/DVDCodecs/Video/AMLCodec.cpp  | 27 -----------------
  .../DVDCodecs/Video/DVDVideoCodecAmlogic.cpp  | 24 ---------------
@@ -13,10 +13,10 @@ This reverts commit 01cbab691387b6894283189aff8265d367f19f32.
  4 files changed, 84 deletions(-)
 
 diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
-index e73ab0218b..863b6f50d1 100644
+index f9ad216753..8bcdfa498e 100644
 --- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
 +++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
-@@ -432,18 +432,9 @@ static vformat_t codecid_to_vformat(enum AVCodecID id)
+@@ -439,18 +439,9 @@ static vformat_t codecid_to_vformat(enum AVCodecID id)
      case AV_CODEC_ID_CAVS:
        format = VFORMAT_AVS;
        break;
@@ -35,7 +35,7 @@ index e73ab0218b..863b6f50d1 100644
  
      default:
        format = VFORMAT_UNSUPPORT;
-@@ -558,22 +549,10 @@ static vdec_type_t codec_tag_to_vdec_type(unsigned int codec_tag)
+@@ -565,22 +556,10 @@ static vdec_type_t codec_tag_to_vdec_type(unsigned int codec_tag)
        // avs
        dec_type = VIDEO_DEC_FORMAT_AVS;
        break;
@@ -58,7 +58,7 @@ index e73ab0218b..863b6f50d1 100644
      default:
        dec_type = VIDEO_DEC_FORMAT_UNKNOW;
        break;
-@@ -2133,12 +2112,6 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+@@ -2154,12 +2133,6 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
        else
          CSysfsPath("/sys/module/amvdec_h265/parameters/nal_skip_policy", 2);
        break;
@@ -72,10 +72,10 @@ index e73ab0218b..863b6f50d1 100644
        am_private->gcodec.format = VIDEO_DEC_FORMAT_VP9;
        am_private->gcodec.param  = (void*)EXTERNAL_PTS;
 diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
-index eebbed1f7d..7b8e645ca8 100644
+index 5ee4121d7b..96fe3ce64f 100644
 --- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
 +++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
-@@ -268,22 +268,6 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
+@@ -240,22 +240,6 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
      case AV_CODEC_ID_CAVS:
        m_pFormatName = "am-avs";
        break;
@@ -98,7 +98,7 @@ index eebbed1f7d..7b8e645ca8 100644
      case AV_CODEC_ID_VP9:
        if (!aml_support_vp9())
        {
-@@ -356,14 +340,6 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
+@@ -328,14 +312,6 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
        m_hints.extradata = FFmpegExtraData(m_bitstream->GetExtraSize());
        memcpy(m_hints.extradata.GetData(), m_bitstream->GetExtraData(), m_hints.extradata.GetSize());
        break;
@@ -114,7 +114,7 @@ index eebbed1f7d..7b8e645ca8 100644
        CLog::Log(LOGDEBUG, "{}: Unknown hints.codec({:d})", __MODULE_NAME__, m_hints.codec);
        goto FAIL;
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 65e110b939..35281fc94c 100644
+index d5ed862ca0..92493e1f2e 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -175,16 +175,6 @@ bool aml_support_hevc_10bit()
@@ -162,10 +162,10 @@ index 65e110b939..35281fc94c 100644
  {
    static int support_dv = -1;
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index a8b9bfae1c..473ccf6f76 100644
+index dff67e93d7..393b56957e 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
-@@ -72,12 +72,9 @@ bool aml_support_hevc();
+@@ -73,12 +73,9 @@ bool aml_support_hevc();
  bool aml_support_hevc_4k2k();
  bool aml_support_hevc_8k4k();
  bool aml_support_hevc_10bit();
@@ -177,7 +177,7 @@ index a8b9bfae1c..473ccf6f76 100644
 -bool aml_support_avs3();
  bool aml_support_dolby_vision();
  bool aml_dolby_vision_enabled();
- bool aml_has_frac_rate_policy();
+ bool aml_convert_to_dv_by_vs_engine(StreamHdrType hdrType);
 -- 
 2.48.1
 

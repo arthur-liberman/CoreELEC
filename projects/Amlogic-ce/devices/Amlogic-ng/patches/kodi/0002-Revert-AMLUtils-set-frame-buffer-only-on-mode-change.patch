@@ -1,20 +1,20 @@
-From b5ac3d6c9a233426ed9737a0455fddf1bc45adef Mon Sep 17 00:00:00 2001
+From 3c4f4af83fc5226024d11472a83c3eb2c91d96a5 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Wed, 19 Feb 2025 00:08:44 +0200
-Subject: [PATCH 01/17] Revert "AMLUtils: set frame buffer only on mode change"
+Date: Sat, 15 Mar 2025 01:51:48 +0200
+Subject: [PATCH 02/17] Revert "AMLUtils: set frame buffer only on mode change"
 
-This reverts commit a8c97b4882f30c48dca0e49094a13df321cb8886.
+This reverts commit d85b356f623720f87db3dead1863ab57e7dff9ca.
 ---
- xbmc/utils/AMLUtils.cpp                     | 60 ++++++++++-----------
+ xbmc/utils/AMLUtils.cpp                     | 63 ++++++++++-----------
  xbmc/utils/AMLUtils.h                       |  2 +
- xbmc/windowing/amlogic/WinSystemAmlogic.cpp |  3 ++
- 3 files changed, 35 insertions(+), 30 deletions(-)
+ xbmc/windowing/amlogic/WinSystemAmlogic.cpp |  3 +
+ 3 files changed, 35 insertions(+), 33 deletions(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 43f8dd4fea..6a53c0e54d 100644
+index fe34075a85..0b13096551 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -1243,33 +1243,8 @@ bool aml_set_hotplug_mode(std::string mode)
+@@ -1244,33 +1244,8 @@ bool aml_set_hotplug_mode(std::string mode)
    return ret;
  }
  
@@ -50,18 +50,24 @@ index 43f8dd4fea..6a53c0e54d 100644
  {
    std::string current_mode = aml_get_drmDevice_mode();
    bool ret = false;
-@@ -1345,8 +1320,6 @@ bool aml_set_drmDevice_mode(const RESOLUTION_INFO &res, std::string mode,
+@@ -1346,14 +1321,9 @@ bool aml_set_drmDevice_mode(const RESOLUTION_INFO &res, std::string mode,
        CLog::Log(LOGDEBUG, "AMLUtils::{} - found mode in connector mode list: [{:d}]:{}", __FUNCTION__, i, mode);
        drmModeFBPtr drm_fb = drmModeGetFB(fd, crtc->buffer_id);
  
--      aml_set_framebuffer_resolution(res.iWidth, res.iHeight, framebuffer_name);
+-      aml_set_framebuffer_resolution(res.iScreenWidth, res.iScreenHeight, framebuffer_name);
+-
+       ret = drmModeSetCrtc(fd, crtc->crtc_id, drm_fb->fb_id, 0, 0,
+         resources->connectors, 1, &connector->modes[i]);
+ 
+-      if (!CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_COREELEC_AMLOGIC_DISABLEGUISCALING))
+-        aml_set_framebuffer_resolution(res.iWidth, res.iHeight, framebuffer_name);
 -
        if (force_mode_switch)
-         set_drmProp(fd, connector->connector_id, "color_force", DRM_MODE_OBJECT_CONNECTOR, 1, NULL);
+         set_drmProp(fd, connector->connector_id, "UPDATE", DRM_MODE_OBJECT_CONNECTOR, 1, NULL);
  
-@@ -1516,7 +1489,9 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
-     force_mode_switch = false;
-   }
+@@ -1517,7 +1487,9 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
+   if (aml_get_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR) != fractional_rate)
+     aml_set_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR, fractional_rate);
  
 -  aml_set_drmDevice_mode(res, mode, framebuffer_name, force_mode_switch);
 +  aml_set_framebuffer_resolution(res.iScreenWidth, res.iScreenHeight, framebuffer_name);
@@ -70,7 +76,7 @@ index 43f8dd4fea..6a53c0e54d 100644
  
    return true;
  }
-@@ -1557,6 +1532,31 @@ void aml_handle_display_stereo_mode(const int stereo_mode)
+@@ -1558,6 +1530,31 @@ void aml_handle_display_stereo_mode(const int stereo_mode)
    }
  }
  
@@ -103,7 +109,7 @@ index 43f8dd4fea..6a53c0e54d 100644
  {
    // 4.9 seg faults on access to /sys/kernel/debug/aml_reg/paddr and since we are CE it's always AML
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index 15decb99d2..f5d3789b26 100644
+index b70d992ad0..cdbd84c7e0 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
 @@ -89,6 +89,8 @@ bool aml_set_native_resolution(const RESOLUTION_INFO &res, std::string framebuff
@@ -116,10 +122,10 @@ index 15decb99d2..f5d3789b26 100644
  bool aml_set_reg_ignore_alpha();
  bool aml_unset_reg_ignore_alpha();
 diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
-index dcddfc54bf..9c4822f80a 100644
+index 3f0ba42d3d..0a3e3248d5 100644
 --- a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
 +++ b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
-@@ -260,6 +260,9 @@ bool CWinSystemAmlogic::InitWindowSystem()
+@@ -266,6 +266,9 @@ bool CWinSystemAmlogic::InitWindowSystem()
    CRendererAML::Register();
    CScreenshotSurfaceAML::Register();
  

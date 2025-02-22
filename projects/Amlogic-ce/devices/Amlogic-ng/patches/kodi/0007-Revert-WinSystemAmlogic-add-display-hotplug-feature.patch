@@ -1,22 +1,22 @@
-From 7236c49dbaf9ae25c6f320f87361f5d775573fc6 Mon Sep 17 00:00:00 2001
+From fc644e7761308c6226dd05745012fa544ac49289 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 09/17] Revert "WinSystemAmlogic: add display hotplug feature"
+Date: Sat, 15 Mar 2025 01:52:43 +0200
+Subject: [PATCH 07/17] Revert "WinSystemAmlogic: add display hotplug feature"
 
-This reverts commit de81a3dde93e9d641a63d7b7526189599acab4d2.
+This reverts commit 6711717121964354cac3fbbd0fae91471db548f7.
 ---
  xbmc/settings/DisplaySettings.cpp           |   2 +-
  xbmc/utils/AMLUtils.cpp                     | 356 ++------------------
  xbmc/utils/AMLUtils.h                       |   4 -
- xbmc/windowing/amlogic/WinSystemAmlogic.cpp | 127 -------
+ xbmc/windowing/amlogic/WinSystemAmlogic.cpp | 128 +------
  xbmc/windowing/amlogic/WinSystemAmlogic.h   |  12 -
- 5 files changed, 30 insertions(+), 471 deletions(-)
+ 5 files changed, 31 insertions(+), 471 deletions(-)
 
 diff --git a/xbmc/settings/DisplaySettings.cpp b/xbmc/settings/DisplaySettings.cpp
-index 640769f9ad..aa27708566 100644
+index 5a77d53914..d96fa913ae 100644
 --- a/xbmc/settings/DisplaySettings.cpp
 +++ b/xbmc/settings/DisplaySettings.cpp
-@@ -117,7 +117,7 @@ static bool write_resolution_ini(RESOLUTION_INFO res)
+@@ -116,7 +116,7 @@ static bool write_resolution_ini(RESOLUTION_INFO res)
    if (!result && fsInfo.f_flags & MS_RDONLY)
      result = mount(NULL, aml_res_path.c_str(), NULL, MS_NOATIME | MS_REMOUNT, NULL);
  
@@ -26,10 +26,10 @@ index 640769f9ad..aa27708566 100644
      std::ofstream ofs(aml_res_path + "/" + aml_res_file, std::ofstream::out);
      ofs << "# WARNING DO NOT MODIFY THIS FILE! ALL CHANGES WILL BE LOST!\n";
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 8acb55520a..208297fe15 100644
+index 92493e1f2e..f4beec321a 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -426,13 +426,6 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+@@ -421,13 +421,6 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
        height = 2160;
        *smode = 'p';
      }
@@ -43,7 +43,7 @@ index 8acb55520a..208297fe15 100644
      else
      {
        return false;
-@@ -533,7 +526,7 @@ drmModeResPtr aml_get_drmDevice_resources(int fd)
+@@ -528,7 +521,7 @@ drmModeResPtr aml_get_drmDevice_resources(int fd)
  }
  
  // get connector of drmDevice
@@ -52,7 +52,7 @@ index 8acb55520a..208297fe15 100644
  {
    drmModeConnectorPtr connector = NULL;
  
-@@ -552,12 +545,13 @@ drmModeConnectorPtr aml_get_drmDevice_connector(int fd, drmModeResPtr resources,
+@@ -547,12 +540,13 @@ drmModeConnectorPtr aml_get_drmDevice_connector(int fd, drmModeResPtr resources,
      if (connector == NULL)
        continue;
  
@@ -71,7 +71,7 @@ index 8acb55520a..208297fe15 100644
    }
  
    return connector;
-@@ -617,47 +611,6 @@ drmModeCrtcPtr aml_get_drmDevice_crtc(int fd, drmModeResPtr resources, drmModeEn
+@@ -612,47 +606,6 @@ drmModeCrtcPtr aml_get_drmDevice_crtc(int fd, drmModeResPtr resources, drmModeEn
    return crtc;
  }
  
@@ -119,7 +119,7 @@ index 8acb55520a..208297fe15 100644
  // get all modes of current connected device
  std::string aml_get_drmDevice_modes(void)
  {
-@@ -680,7 +633,7 @@ std::string aml_get_drmDevice_modes(void)
+@@ -675,7 +628,7 @@ std::string aml_get_drmDevice_modes(void)
      return modes;
    }
  
@@ -128,7 +128,7 @@ index 8acb55520a..208297fe15 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -739,10 +692,9 @@ int get_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_type
+@@ -734,10 +687,9 @@ int get_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_type
    return ret;
  }
  
@@ -140,7 +140,7 @@ index 8acb55520a..208297fe15 100644
    drmModeObjectPropertiesPtr props = NULL;
  
    props = drmModeObjectGetProperties(fd, id, obj_type);
-@@ -761,16 +713,8 @@ void set_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_typ
+@@ -756,16 +708,8 @@ void set_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_typ
  
      if (StringUtils::EqualsNoCase(prop->name, name))
      {
@@ -159,7 +159,7 @@ index 8acb55520a..208297fe15 100644
  
        CLog::Log(LOGDEBUG, "AMLUtils::{} - set property '{}', value: {:d}", __FUNCTION__, prop->name, value);
        drmModeFreeProperty(prop);
-@@ -792,7 +736,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+@@ -787,7 +731,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
    drmModeEncoderPtr encoder = NULL;
    drmModeCrtcPtr crtc = NULL;
    unsigned int id;
@@ -167,7 +167,7 @@ index 8acb55520a..208297fe15 100644
  
    if (fd < 0)
    {
-@@ -808,7 +751,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+@@ -803,7 +746,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
      return;
    }
  
@@ -176,7 +176,7 @@ index 8acb55520a..208297fe15 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -817,15 +760,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+@@ -812,15 +755,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
      return;
    }
  
@@ -192,7 +192,7 @@ index 8acb55520a..208297fe15 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -861,7 +795,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+@@ -856,7 +790,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
        return;
    }
  
@@ -201,7 +201,7 @@ index 8acb55520a..208297fe15 100644
  
    drmModeFreeResources(resources);
    drmModeFreeConnector(connector);
-@@ -880,7 +814,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+@@ -875,7 +809,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
    drmModeEncoderPtr encoder = NULL;
    drmModeCrtcPtr crtc = NULL;
    unsigned int id;
@@ -209,7 +209,7 @@ index 8acb55520a..208297fe15 100644
  
    if (fd < 0)
    {
-@@ -896,7 +829,7 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+@@ -891,7 +824,7 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
      return ret;
    }
  
@@ -218,7 +218,7 @@ index 8acb55520a..208297fe15 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -905,23 +838,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+@@ -900,23 +833,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
      return ret;
    }
  
@@ -242,7 +242,7 @@ index 8acb55520a..208297fe15 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -977,8 +893,6 @@ std::string aml_get_drmDevice_mode(void)
+@@ -972,8 +888,6 @@ std::string aml_get_drmDevice_mode(void)
    drmModeEncoderPtr encoder = NULL;
    drmModeCrtcPtr crtc = NULL;
    std::string mode = "";
@@ -251,7 +251,7 @@ index 8acb55520a..208297fe15 100644
  
    if (fd < 0)
    {
-@@ -994,7 +908,7 @@ std::string aml_get_drmDevice_mode(void)
+@@ -989,7 +903,7 @@ std::string aml_get_drmDevice_mode(void)
      return mode;
    }
  
@@ -260,7 +260,7 @@ index 8acb55520a..208297fe15 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -1003,16 +917,6 @@ std::string aml_get_drmDevice_mode(void)
+@@ -998,16 +912,6 @@ std::string aml_get_drmDevice_mode(void)
      return mode;
    }
  
@@ -277,7 +277,7 @@ index 8acb55520a..208297fe15 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -1047,191 +951,6 @@ std::string aml_get_drmDevice_mode(void)
+@@ -1042,191 +946,6 @@ std::string aml_get_drmDevice_mode(void)
    return mode;
  }
  
@@ -469,7 +469,7 @@ index 8acb55520a..208297fe15 100644
  bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string mode,
    bool force_mode_switch)
  {
-@@ -1243,7 +962,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+@@ -1238,7 +957,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
    drmModeConnectorPtr connector = NULL;
    drmModeEncoderPtr encoder = NULL;
    drmModeCrtcPtr crtc = NULL;
@@ -477,7 +477,7 @@ index 8acb55520a..208297fe15 100644
  
    CLog::Log(LOGDEBUG, "AMLUtils::{} - current mode: {}, new mode: {}", __FUNCTION__,
      current_mode, mode);
-@@ -1262,7 +980,7 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+@@ -1257,7 +975,7 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
      return ret;
    }
  
@@ -486,7 +486,7 @@ index 8acb55520a..208297fe15 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -1271,16 +989,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+@@ -1266,16 +984,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
      return ret;
    }
  
@@ -503,7 +503,7 @@ index 8acb55520a..208297fe15 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -1416,27 +1124,21 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
+@@ -1411,27 +1119,21 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
      if (((StringUtils::StartsWith(i->c_str(), "4k2k")) && (aml_support_h264_4k2k() > AML_NO_H264_4K2K)) || !(StringUtils::StartsWith(i->c_str(), "4k2k")))
      {
        if (aml_mode_to_resolution(i->c_str(), &res))
@@ -545,10 +545,10 @@ index 8acb55520a..208297fe15 100644
        }
      }
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index 7a43922c11..7e06f9e031 100644
+index 393b56957e..91534d9402 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
-@@ -96,7 +96,3 @@ bool aml_unset_reg_ignore_alpha();
+@@ -95,7 +95,3 @@ bool aml_unset_reg_ignore_alpha();
  
  void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int value);
  int aml_get_drmProperty(std::string name, unsigned int obj_type);
@@ -557,7 +557,7 @@ index 7a43922c11..7e06f9e031 100644
 -std::string aml_get_preferred_mode(void);
 -bool aml_set_hotplug_mode(std::string mode);
 diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
-index 49b826b8b1..287cabdb44 100644
+index 0a3e3248d5..5f1fc89da0 100644
 --- a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
 +++ b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
 @@ -20,7 +20,6 @@
@@ -568,16 +568,17 @@ index 49b826b8b1..287cabdb44 100644
  #include "platform/linux/ScreenshotSurfaceAML.h"
  #include "settings/DisplaySettings.h"
  #include "settings/Settings.h"
-@@ -38,8 +37,6 @@
+@@ -37,8 +36,7 @@
+ #include "platform/linux/SysfsPath.h"
  
  #include <linux/fb.h>
- #include <linux/version.h>
 -#include <poll.h>
 -#include <unistd.h>
++#include <linux/version.h>
  
  #include "system_egl.h"
  
-@@ -49,9 +46,6 @@ CWinSystemAmlogic::CWinSystemAmlogic()
+@@ -48,9 +46,6 @@ CWinSystemAmlogic::CWinSystemAmlogic()
  :  m_nativeWindow(NULL)
  ,  m_libinput(new CLibInputHandler)
  ,  m_force_mode_switch(false)
@@ -587,7 +588,7 @@ index 49b826b8b1..287cabdb44 100644
  {
    const char *env_framebuffer = getenv("FRAMEBUFFER");
  
-@@ -72,11 +66,6 @@ CWinSystemAmlogic::CWinSystemAmlogic()
+@@ -71,11 +66,6 @@ CWinSystemAmlogic::CWinSystemAmlogic()
    m_libinput->Start();
  }
  
@@ -599,7 +600,7 @@ index 49b826b8b1..287cabdb44 100644
  void CWinSystemAmlogic::SettingOptionsComponentsFiller(const SettingConstPtr& setting,
                                                   std::vector<IntegerSettingOption>& list,
                                                   int& current,
-@@ -91,105 +80,6 @@ void CWinSystemAmlogic::SettingOptionsComponentsFiller(const SettingConstPtr& se
+@@ -90,105 +80,6 @@ void CWinSystemAmlogic::SettingOptionsComponentsFiller(const SettingConstPtr& se
      list.emplace_back(g_localizeStrings.Get(14427), AML_DV_PLAYER_LED);
  }
  
@@ -705,7 +706,7 @@ index 49b826b8b1..287cabdb44 100644
  bool CWinSystemAmlogic::InitWindowSystem()
  {
    const std::shared_ptr<CSettings> settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-@@ -284,23 +174,6 @@ bool CWinSystemAmlogic::InitWindowSystem()
+@@ -279,23 +170,6 @@ bool CWinSystemAmlogic::InitWindowSystem()
    // Close the OpenVFD splash and switch the display into time mode.
    CSysfsPath("/tmp/openvfd_service", 0);
  

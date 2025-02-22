@@ -1,17 +1,17 @@
-From b07028776e12715e701ad003dad952547889afac Mon Sep 17 00:00:00 2001
+From 6ca782e4223883dc2f074766a9cddaf727ffb534 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Thu, 9 Jan 2025 00:07:22 +0200
+Date: Sat, 15 Mar 2025 02:06:23 +0200
 Subject: [PATCH 15/17] Revert "AMLUtils: implement drmDevice handling for
  Amlogic 5.4 kernel"
 
-This reverts commit 5489165ff1f1a2ea618d4149c4f21292de702dde.
+This reverts commit 48fd586e41eab7fa91141552f792e5570005b8de.
 ---
  cmake/platform/linux/aml.cmake                |   2 +-
- .../VideoPlayer/DVDCodecs/Video/AMLCodec.cpp  |  25 +-
+ .../VideoPlayer/DVDCodecs/Video/AMLCodec.cpp  |  24 +-
  xbmc/utils/AMLUtils.cpp                       | 472 ++++--------------
  xbmc/utils/AMLUtils.h                         |   8 +-
  xbmc/windowing/amlogic/WinSystemAmlogic.cpp   |   4 +-
- 5 files changed, 127 insertions(+), 384 deletions(-)
+ 5 files changed, 126 insertions(+), 384 deletions(-)
 
 diff --git a/cmake/platform/linux/aml.cmake b/cmake/platform/linux/aml.cmake
 index f43890582f..673877bd16 100644
@@ -23,7 +23,7 @@ index f43890582f..673877bd16 100644
  set(APP_RENDER_SYSTEM gles)
  list(APPEND PLATFORM_OPTIONAL_DEPS LibDovi)
 diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
-index d0dc8ecd6e..b083e90b66 100644
+index 2f02477700..b9624f84c3 100644
 --- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
 +++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
 @@ -286,6 +286,7 @@ typedef struct hdr_buf {
@@ -34,16 +34,15 @@ index d0dc8ecd6e..b083e90b66 100644
  #define DOLBY_VISION_LL_DISABLE (unsigned int)(0)
  #define DOLBY_VISION_LL_YUV422  (unsigned int)(1)
  
-@@ -2017,14 +2018,21 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+@@ -2024,14 +2025,21 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
      // enable Dolby Vision
      CSysfsPath("/sys/module/amdolby_vision/parameters/dolby_vision_enable", 'Y');
  
 -    // use player led mode when enabled
--    CSysfsPath dolby_vision_ll_policy{"/sys/module/aml_media/parameters/dolby_vision_ll_policy"};
--    if (dolby_vision_ll_policy.Exists())
 +    // force player led mode when enabled
 +    CSysfsPath dolby_vision_flags{"/sys/module/amdolby_vision/parameters/dolby_vision_flags"};
-+    CSysfsPath dolby_vision_ll_policy{"/sys/module/amdolby_vision/parameters/dolby_vision_ll_policy"};
+     CSysfsPath dolby_vision_ll_policy{"/sys/module/amdolby_vision/parameters/dolby_vision_ll_policy"};
+-    if (dolby_vision_ll_policy.Exists())
 +    if (dolby_vision_flags.Exists() && dolby_vision_ll_policy.Exists())
      {
        if (CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(CSettings::SETTING_COREELEC_AMLOGIC_DV_LED) == AML_DV_PLAYER_LED)
@@ -58,8 +57,8 @@ index d0dc8ecd6e..b083e90b66 100644
 +      }
      }
  
-     am_private->gcodec.dv_enable = 1;
-@@ -2035,14 +2043,16 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
+     // setup Dolby Vision VS-Engine for non DV media
+@@ -2055,14 +2063,16 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
        {
          CSysfsPath amdolby_vision_debug{"/sys/class/amdolby_vision/debug"};
          if (amdolby_vision_debug.Exists())
@@ -79,19 +78,20 @@ index d0dc8ecd6e..b083e90b66 100644
  
    // DEC_CONTROL_FLAG_DISABLE_FAST_POC
    CSysfsPath("/sys/module/amvdec_h264/parameters/dec_control", 4);
-@@ -2319,10 +2329,7 @@ void CAMLCodec::CloseDecoder()
+@@ -2347,11 +2357,7 @@ void CAMLCodec::CloseDecoder()
  
    CSysfsPath amdolby_vision_debug{"/sys/class/amdolby_vision/debug"};
    if (amdolby_vision_debug.Exists())
 -  {
      amdolby_vision_debug.Set("enable_fel 0");
 -    amdolby_vision_debug.Set("enable_mel 0");
+-    amdolby_vision_debug.Set("force_unmap");
 -  }
  
    ShowMainVideo(false);
  
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 5e78b26b93..25c31b8ce2 100644
+index 74e67b007d..995296197b 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -57,30 +57,6 @@ int aml_get_cpufamily_id()
@@ -515,11 +515,11 @@ index 5e78b26b93..25c31b8ce2 100644
 -      CLog::Log(LOGDEBUG, "AMLUtils::{} - found mode in connector mode list: [{:d}]:{}", __FUNCTION__, i, mode);
 -      drmModeFBPtr drm_fb = drmModeGetFB(fd, crtc->buffer_id);
 -
--      if (force_mode_switch)
--        drmModeSetCrtc(fd, crtc->crtc_id, 0, 0, 0, NULL, 0, NULL);
--
 -      ret = drmModeSetCrtc(fd, crtc->crtc_id, drm_fb->fb_id, 0, 0,
 -        resources->connectors, 1, &connector->modes[i]);
+-
+-      if (force_mode_switch)
+-        set_drmProp(fd, connector->connector_id, "UPDATE", DRM_MODE_OBJECT_CONNECTOR, 1, NULL);
 -
 -      drmModeFreeFB(drm_fb);
 -      break;
@@ -648,7 +648,7 @@ index 5e78b26b93..25c31b8ce2 100644
  {
    int fd0;
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index a9416d5e8e..e330410d20 100644
+index ddb15ea8b4..dcacb18f8d 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
 @@ -8,9 +8,6 @@
@@ -658,10 +658,10 @@ index a9416d5e8e..e330410d20 100644
 -#include <xf86drm.h>
 -#include <xf86drmMode.h>
 -
+ #include "utils/StreamDetails.h"
  #include "windowing/Resolution.h"
  
- #include <string>
-@@ -65,8 +62,8 @@ enum AML_DISPLAY_DV_LED
+@@ -66,8 +63,8 @@ enum AML_DISPLAY_DV_LED
  #define AML_S5      0x3E
  
  int  aml_get_cpufamily_id();
@@ -683,7 +683,7 @@ index a9416d5e8e..e330410d20 100644
  void aml_set_framebuffer_resolution(unsigned int width, unsigned int height, std::string framebuffer_name);
  bool aml_has_capability_ignore_alpha();
 diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
-index 5191c20129..a6d2aeccef 100644
+index dce1e4dc4c..14310c34b5 100644
 --- a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
 +++ b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
 @@ -71,7 +71,7 @@ void CWinSystemAmlogic::SettingOptionsComponentsFiller(const SettingConstPtr& se
@@ -695,7 +695,7 @@ index 5191c20129..a6d2aeccef 100644
  
    if ((dv_cap & DV_RGB_444_8BIT) != 0)
      list.emplace_back(g_localizeStrings.Get(14426), AML_DV_TV_LED);
-@@ -127,7 +127,7 @@ bool CWinSystemAmlogic::InitWindowSystem()
+@@ -133,7 +133,7 @@ bool CWinSystemAmlogic::InitWindowSystem()
      CServiceBroker::GetSettingsComponent()->GetSettings()->
        GetSettingsManager()->RegisterSettingOptionsFiller("dv_led_modes", SettingOptionsComponentsFiller);
  

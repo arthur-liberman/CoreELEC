@@ -1,4 +1,4 @@
-From eacf70f54d9f45ca084e3cdfb390f13d059a1d3c Mon Sep 17 00:00:00 2001
+From 278da41cc65ef5cc521a84bf087699d8a7519da0 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 01:41:54 +0200
 Subject: [PATCH 16/17] alsa: fix soc name for linux 4.9

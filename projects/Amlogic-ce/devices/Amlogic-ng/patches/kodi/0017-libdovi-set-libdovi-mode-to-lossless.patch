@@ -1,4 +1,4 @@
-From c3a14dd0080e316a9a5e70e4b3368703c157c2d6 Mon Sep 17 00:00:00 2001
+From ce2a805977eab110c2e2d0834b2fda35c93fbc95 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 16:12:04 +0200
 Subject: [PATCH 17/17] libdovi: set libdovi mode to lossless
@@ -8,10 +8,10 @@ Subject: [PATCH 17/17] libdovi: set libdovi mode to lossless
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/system/settings/settings.xml b/system/settings/settings.xml
-index 6b80ee32f9..2ab7864c81 100755
+index 611b487273..5859ac165d 100755
 --- a/system/settings/settings.xml
 +++ b/system/settings/settings.xml
-@@ -317,7 +317,7 @@
+@@ -294,7 +294,7 @@
              </dependency>
            </dependencies>
            <level>2</level>

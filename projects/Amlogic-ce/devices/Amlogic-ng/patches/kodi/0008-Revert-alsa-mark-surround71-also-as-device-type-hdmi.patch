@@ -1,9 +1,9 @@
-From 2d1bc84b8c65a31dc1ce23e727937ee403bd270c Mon Sep 17 00:00:00 2001
+From 33d048e7f9981201707dccfba9724824c7cbceba Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 10/17] Revert "alsa: mark surround71 also as device type hdmi"
+Date: Sat, 15 Mar 2025 01:52:47 +0200
+Subject: [PATCH 08/17] Revert "alsa: mark surround71 also as device type hdmi"
 
-This reverts commit 52bedc98aef0b493c404c69da81706337206608e.
+This reverts commit 31f6f17ae2f063d53c59f5ed7138e103441be9ff.
 ---
  .../AudioEngine/Engines/ActiveAE/ActiveAE.cpp | 28 +---------
  .../AudioEngine/Engines/ActiveAE/ActiveAE.h   |  2 +-
@@ -156,10 +156,10 @@ index 96d14cce9c..51fa60a0a8 100644
  #include <memory>
  #include <utility>
 diff --git a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
-index fb6b22eb34..e137df228e 100644
+index 570985218b..3b0453bfce 100644
 --- a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
 +++ b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
-@@ -1608,10 +1608,9 @@ void CAESinkALSA::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
+@@ -1607,10 +1607,9 @@ void CAESinkALSA::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
  
  AEDeviceType CAESinkALSA::AEDeviceTypeFromName(const std::string &name)
  {
@@ -172,7 +172,7 @@ index fb6b22eb34..e137df228e 100644
      return AE_DEVTYPE_IEC958;
  
    return AE_DEVTYPE_PCM;
-@@ -1872,54 +1871,25 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
+@@ -1871,54 +1870,25 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
        info.m_displayNameExtra = "S/PDIF";
      else if (info.m_deviceType != AE_DEVTYPE_HDMI)
      {

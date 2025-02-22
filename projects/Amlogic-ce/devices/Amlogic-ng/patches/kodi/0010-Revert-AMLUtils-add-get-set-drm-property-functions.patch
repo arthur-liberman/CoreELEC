@@ -1,16 +1,16 @@
-From 4e7a50fe216f0bf32ba8dc86253039cae4df4edd Mon Sep 17 00:00:00 2001
+From 10580ff1f4b1d7d61aab53e6264687fb2a9b83aa Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 11/17] Revert "AMLUtils: add get/set drm property functions"
+Date: Sat, 15 Mar 2025 01:53:13 +0200
+Subject: [PATCH 10/17] Revert "AMLUtils: add get/set drm property functions"
 
-This reverts commit 8b6c4a31d60d84d9f3305c44c28842887ca0be0d.
+This reverts commit c0c3d3dd91807f4997a7fb653b02362ac817310e.
 ---
  xbmc/utils/AMLUtils.cpp | 227 ----------------------------------------
  xbmc/utils/AMLUtils.h   |   3 -
  2 files changed, 230 deletions(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 208297fe15..1bddf7c147 100644
+index 697ba6b7c6..945943aa24 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -657,233 +657,6 @@ std::string aml_get_drmDevice_modes(void)
@@ -248,7 +248,7 @@ index 208297fe15..1bddf7c147 100644
  std::string aml_get_drmDevice_mode(void)
  {
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index 7e06f9e031..a9416d5e8e 100644
+index d369c70f7a..ddb15ea8b4 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
 @@ -93,6 +93,3 @@ void aml_set_framebuffer_resolution(unsigned int width, unsigned int height, std

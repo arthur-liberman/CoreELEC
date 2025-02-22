@@ -1,16 +1,16 @@
-From 637e3e07c84fa096aa9acee7e3e19c652857774d Mon Sep 17 00:00:00 2001
+From 155d56330f3a8db173a4a385f19e1531a74c279e Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Wed, 19 Feb 2025 00:48:17 +0200
+Date: Sat, 15 Mar 2025 01:51:48 +0200
 Subject: [PATCH 03/17] Revert "AMLUtils: update set video mode for
  framepackaging support"
 
-This reverts commit b660bb33288f939c73c3f0f0cb2253e7c02f1764.
+This reverts commit d182b119eda067e9a061cfbb6c528b4d778c0bec.
 ---
  xbmc/utils/AMLUtils.cpp | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index b5b314c22a..f95f718b42 100644
+index 0b13096551..fe2a32701f 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -301,7 +301,7 @@ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int vie

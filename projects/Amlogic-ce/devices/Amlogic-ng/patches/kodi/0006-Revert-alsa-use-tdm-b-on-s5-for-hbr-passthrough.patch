@@ -1,9 +1,9 @@
-From 6e01f1ef22eb56001f3c967e629b565e9594036e Mon Sep 17 00:00:00 2001
+From 56691b53b7dbc4cf5ead2843f376d5c2cd5a10c7 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
-Date: Thu, 9 Jan 2025 00:06:41 +0200
-Subject: [PATCH 08/17] Revert "alsa: use tdm-b on s5 for hbr passthrough"
+Date: Sat, 15 Mar 2025 01:52:23 +0200
+Subject: [PATCH 06/17] Revert "alsa: use tdm-b on s5 for hbr passthrough"
 
-This reverts commit 3d3dc28dc33e9f1d93cba843fa30b541e9ec67ef.
+This reverts commit 87cd735b708f87739a7d327105357c6511debe83.
 ---
  .../AudioEngine/Engines/ActiveAE/ActiveAE.cpp |  2 --
  .../Engines/ActiveAE/ActiveAESettings.cpp     |  5 ++---
@@ -83,7 +83,7 @@ index e397ca6567..37fae7b173 100644
          continue;
  
 diff --git a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
-index 9b5699ec40..fb6b22eb34 100644
+index 2ec145c19d..570985218b 100644
 --- a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
 +++ b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
 @@ -576,7 +576,7 @@ void CAESinkALSA::aml_configure_simple_control(std::string &device, const enum I
@@ -113,7 +113,7 @@ index 9b5699ec40..fb6b22eb34 100644
                  case AML_T7:
                    switch (codec) {
                      case TRUEHD:
-@@ -1619,9 +1608,8 @@ void CAESinkALSA::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
+@@ -1618,9 +1607,8 @@ void CAESinkALSA::EnumerateDevicesEx(AEDeviceInfoList &list, bool force)
  
  AEDeviceType CAESinkALSA::AEDeviceTypeFromName(const std::string &name)
  {
@@ -124,7 +124,7 @@ index 9b5699ec40..fb6b22eb34 100644
      return AE_DEVTYPE_HDMI;
    else if (name.substr(0, name.find(':')) == "iec958" || name.substr(0, name.find(':')) == "spdif")
      return AE_DEVTYPE_IEC958;
-@@ -1880,7 +1868,6 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
+@@ -1879,7 +1867,6 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
  
    if (GetAMLDeviceType(info.m_displayName) != AML_NONE)
    {
@@ -132,7 +132,7 @@ index 9b5699ec40..fb6b22eb34 100644
      if (info.m_deviceType == AE_DEVTYPE_IEC958)
        info.m_displayNameExtra = "S/PDIF";
      else if (info.m_deviceType != AE_DEVTYPE_HDMI)
-@@ -1890,7 +1877,7 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
+@@ -1889,7 +1876,7 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
        else
          info.m_displayNameExtra = "PCM";
      }
@@ -141,7 +141,7 @@ index 9b5699ec40..fb6b22eb34 100644
      {
        if (device.substr(0, device.find(':')) == "surround71")
          info.m_displayNameExtra = "HDMI Multi Ch PCM";
-@@ -1902,8 +1889,6 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
+@@ -1901,8 +1888,6 @@ void CAESinkALSA::EnumerateDevice(AEDeviceInfoList &list, const std::string &dev
    {
      switch (aml_get_cpufamily_id())
      {
