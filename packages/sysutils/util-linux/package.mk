@@ -14,6 +14,15 @@ PKG_LONGDESC="A large variety of low-level system utilities that are necessary f
 PKG_TOOLCHAIN="autotools"
 PKG_BUILD_FLAGS="+pic:host"
 
+# Rollback package for 4.9 kernel and avoid future conflicts on rebase
+case "${KODI_VENDOR}" in
+  amlogic-4.9)
+    PKG_VERSION="2.40.4"
+    PKG_SHA256="5c1daf733b04e9859afdc3bd87cc481180ee0f88b5c0946b16fdec931975fb79"
+    PKG_URL="https://www.kernel.org/pub/linux/utils/util-linux/v$(get_pkg_version_maj_min)/${PKG_NAME}-${PKG_VERSION}.tar.xz"
+    ;;
+esac
+
 UTILLINUX_CONFIG_DEFAULT="--disable-gtk-doc \
                           --disable-nls \
                           --disable-rpath \
