@@ -1,0 +1,1610 @@
+From 5985cde30fc2dd756ca93e38352e8e51baa41dc7 Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Sat, 9 Nov 2024 03:40:26 +0000
+Subject: [PATCH] VC-1 Error count not PTS
+
+---
+ drivers/frame_provider/decoder/vc1/vvc1.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/frame_provider/decoder/vc1/vvc1.c b/drivers/frame_provider/decoder/vc1/vvc1.c
+index bd2c5b4b..c293a506 100644
+--- a/drivers/frame_provider/decoder/vc1/vvc1.c
++++ b/drivers/frame_provider/decoder/vc1/vvc1.c
+@@ -819,7 +819,7 @@ int vvc1_dec_status(struct vdec_s *vdec, struct vdec_info *vstatus)
+ 		vstatus->frame_rate = 96000 / vvc1_amstream_dec_info.rate;
+ 	else
+ 		vstatus->frame_rate = -1;
+-	vstatus->error_count = READ_VREG(AV_SCRATCH_C);
++	vstatus->error_count = READ_VREG(AV_SCRATCH_6);
+ 	vstatus->status = stat;
+ 	vstatus->bit_rate = gvs->bit_rate;
+ 	vstatus->frame_dur = vvc1_amstream_dec_info.rate;
+-- 
+2.48.1
+
+From 9dd58546b2bf9ca551dc1f9baa9b24250ec445a7 Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Sat, 1 Feb 2025 07:14:44 +0000
+Subject: [PATCH 1/8] vh265: alternative transfer characteristics  sei parser
+
+---
+ drivers/frame_provider/decoder/h265/vh265.c | 36 +++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/drivers/frame_provider/decoder/h265/vh265.c b/drivers/frame_provider/decoder/h265/vh265.c
+index 29a209ad..086e4531 100644
+--- a/drivers/frame_provider/decoder/h265/vh265.c
++++ b/drivers/frame_provider/decoder/h265/vh265.c
+@@ -2057,6 +2057,8 @@ struct hevc_state_s {
+ 	/* data for SEI_CONTENT_LIGHT_LEVEL */
+ 	unsigned int content_light_level[2];
+ 
++	u32 alternative_transfer_characteristics;
++
+ 	struct PIC_s *pre_top_pic;
+ 	struct PIC_s *pre_bot_pic;
+ 
+@@ -8851,6 +8853,30 @@ void *memmem(const void *haystack, size_t n, const void *needle, size_t m)
+ 	return NULL;
+ }
+ 
++//
++// Special Parser to find Alternative Transfer Characteristics - of type 18 (HLG)
++//
++// parse_sei not working correctly with this data, hence seperate parse for now until fixed.
++//
++// This parse will check the full input is an exact match for expected (the SEI appears missing the payload type)
++//
++// Only exact match is considered good to process.
++//
++#define SEI_HLG_PATTERN \
++  "\x01\x12\x80\x00\x00\x00\x00\x00" \
++  "\x00\x00\x00\x00\x00\x00\x00\x00" \
++  "\x00\x00\x00\x00\x00\x00\x00\x00" \
++  "\x00\x00\x00\x00\x00\x00\x00\x00"
++
++#define SEI_HLG_PATTERN_LEN 32
++
++void alt_hlg_parse_sei(struct hevc_state_s *hevc, unsigned char* input, size_t input_len) {
++
++  if ((input_len == SEI_HLG_PATTERN_LEN) && 
++      (memcmp(input, SEI_HLG_PATTERN, SEI_HLG_PATTERN_LEN) == 0))
++    hevc->alternative_transfer_characteristics = 18;
++}
++
+ //
+ // Special Parser to find ATEME SEI Mastering Display Colour Volume and Content Light Level
+ //
+@@ -8997,6 +9023,8 @@ static void set_frame_info(struct hevc_state_s *hevc, struct vframe_s *vf,
+ 				parse_sei(hevc, pic, p, size);
+ 				if (size > 42) // check for ateme
+ 					ateme_parse_sei(hevc, p, size);
++				else if (size == 32) // check for alternative transfer characteristics - hlg
++					alt_hlg_parse_sei(hevc, p, size);
+ 			}
+ 			p += size;
+ 		}
+@@ -9018,6 +9046,14 @@ static void set_frame_info(struct hevc_state_s *hevc, struct vframe_s *vf,
+ 			data = data | (1<<31);
+ 			vf->signal_type = data;
+ 		}
++
++		// If the existing transer characteristics is 14 (BT2020-10), and we have an alternative for 18 (HLG), then treat as HLG.
++		if ((((vf->signal_type >> 8) & 0xff) == 14) && (hevc->alternative_transfer_characteristics == 18)) {
++			u32 data = vf->signal_type;
++			data = data & 0xFFFF00FF;  // Clear bits 8-15
++			data = data | (18<<8);     // Set transfer characteristic to 18 for HLG
++			vf->signal_type = data;
++		}
+ 	}
+ 	else
+ 		vf->signal_type = 0;
+-- 
+2.48.1
+
+
+From bc0fb9607f6e6e30d6205e92aab4c1c64f8390a9 Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Sun, 2 Feb 2025 15:01:34 +0000
+Subject: [PATCH 2/8] vh265: refactor ATEME sei parsing to include alternative
+ transfer characteristics
+
+---
+ drivers/frame_provider/decoder/h265/vh265.c | 197 +++++++++++++-------
+ 1 file changed, 129 insertions(+), 68 deletions(-)
+
+diff --git a/drivers/frame_provider/decoder/h265/vh265.c b/drivers/frame_provider/decoder/h265/vh265.c
+index 086e4531..d463f6d3 100644
+--- a/drivers/frame_provider/decoder/h265/vh265.c
++++ b/drivers/frame_provider/decoder/h265/vh265.c
+@@ -144,6 +144,7 @@ to enable DV of frame mode
+ #define IS_4K_SIZE(w, h)  (((w) * (h)) > (1920*1088))
+ 
+ #define SEI_UserDataITU_T_T35	4
++#define SEI_Alternative_Transfer_Characteristics	147
+ #define INVALID_IDX -1  /* Invalid buffer index.*/
+ 
+ static struct semaphore h265_sema;
+@@ -8878,88 +8879,148 @@ void alt_hlg_parse_sei(struct hevc_state_s *hevc, unsigned char* input, size_t i
+ }
+ 
+ //
+-// Special Parser to find ATEME SEI Mastering Display Colour Volume and Content Light Level
++// Special Parser implementation for ATEME Titan - multiple SEI in NAL Unit.
+ //
+-// parse_sei not working correctly with this data, hence seperate parse for now until fixed.
+-//
+-// This parse will look for the ATEME string (would be inside the user data SEI which appears missing the payload type)
+-// Then attempts to find the exact type and size for SEI Mastering Display Colour Volume
+-// Then attempts to find the exact type and size for SEI Content Light Level, exactly after the SEI MDCV
+-//
+-// Only if both SEI are found in the above in the exact order then can be considered good to process.
++// Attempts to find the exact type and size for SEI Mastering Display Colour Volume
++// Attempts to find the exact type and size for SEI Content Light Level
++// Attempts to find the exact type and size for SEI Alternative Transfer Characteristics
+ //
+-void ateme_parse_sei(struct hevc_state_s *hevc, unsigned char* input, size_t input_len) {
+-
+-	if (!hevc || !input || input_len == 0) return;
+-
+-	static const char* ateme_id = "ATEME Titan";
+-	static const size_t ateme_id_len = 11;
+-
+-	static const unsigned char sei_mdcv_header[] = {SEI_MasteringDisplayColorVolume, 0x18};
+-	static const size_t sei_mdcv_header_len = sizeof(sei_mdcv_header);
+-	static const int sei_mdcv_data_len = 24;
+-
+-	static const unsigned char sei_cll_header[] = {SEI_ContentLightLevel, 0x04};
+-	static const size_t sei_cll_header_len = sizeof(sei_cll_header);
+-	static const int sei_cll_data_len = 4;
+-
+-	unsigned char sei_mdcv_data[sei_mdcv_data_len];
+-	unsigned char sei_cll_data[sei_cll_data_len];
+-
+-	unsigned char* ateme_id_pos = memmem(input, input_len, ateme_id, ateme_id_len);
+-	if (!ateme_id_pos) return;
++static void process_mdcv_sei(struct hevc_state_s *hevc, const unsigned char* data) {
++
++  const unsigned char* p_sei = data;
++	int color;
++	int coord;
++	int type;
++
++  // Process display primaries (RGB coordinates)
++  for (color = 0; color < 3; color++) {
++    for (coord = 0; coord < 2; coord++) {
++      hevc->primaries[color][coord] = (p_sei[0] << 8) | p_sei[1];
++      p_sei += 2;
++    }
++  }
+ 
+-	size_t remaining_len = input_len - (ateme_id_pos - input);
++  // Process white point coordinates
++  for (coord = 0; coord < 2; coord++) {
++    hevc->white_point[coord] = (p_sei[0] << 8) | p_sei[1];
++    p_sei += 2;
++  }
+ 
+-	unsigned char* sei_mdcv_pos = memmem(ateme_id_pos, remaining_len, sei_mdcv_header, sei_mdcv_header_len);
+-	if (!sei_mdcv_pos) return;
++  // Process min/max luminance values
++  for (type = 0; type < 2; type++) {
++    hevc->luminance[type] = (p_sei[0] << 24) | 
++                            (p_sei[1] << 16) |
++                            (p_sei[2] << 8)  |
++                             p_sei[3];
++  p_sei += 4;
++  }
+ 
+-	// Check if there's enough data for mdcv copy
+-	if (remaining_len < sei_mdcv_header_len + sei_mdcv_data_len) return;
++  hevc->sei_present_flag |= SEI_MASTER_DISPLAY_COLOR_MASK;
++}
+ 
+-	memcpy(sei_mdcv_data, sei_mdcv_pos + sei_mdcv_header_len, sei_mdcv_data_len);
++static void process_cll_sei(struct hevc_state_s *hevc, const unsigned char* data) {
+ 
+-	remaining_len -= sei_mdcv_header_len + sei_mdcv_data_len;
++  const unsigned char* p_sei = data;
++    
++  // Process max content light level
++  hevc->content_light_level[0] = (p_sei[0] << 8) | p_sei[1];
++  p_sei += 2;
++    
++  // Process max frame average light level
++  hevc->content_light_level[1] = (p_sei[0] << 8) | p_sei[1];
++    
++  hevc->sei_present_flag |= SEI_CONTENT_LIGHT_LEVEL_MASK;
++}
+ 
+-	// Check if there's enough data for cll copy
+-	if (remaining_len < sei_cll_header_len + sei_cll_data_len) return;
++static void process_atc_sei(struct hevc_state_s *hevc, const unsigned char* data) {
+ 
+-	unsigned char* sei_cll_pos = sei_mdcv_pos + sei_mdcv_header_len + sei_mdcv_data_len;
++  hevc->alternative_transfer_characteristics = *data;
++}
+ 
+-	// Next must be the sei cll.
+-	if (memcmp(sei_cll_pos, sei_cll_header, sei_cll_header_len) != 0) return; 
++#define SEI_MDCV_LENGTH 24 // 0x18
++#define SEI_CLL_LENGTH   4 // 0x04
++#define SEI_ATC_LENGTH   1 // 0x01
+ 
+-	memcpy(sei_cll_data, sei_cll_pos + sei_cll_header_len, sei_cll_data_len);
++#define ATEME_ID "ATEME Titan"
++#define ATEME_ID_LEN 11
+ 
+-	int i;
+-	int j;
++void ateme_parse_sei(struct hevc_state_s *hevc, unsigned char* input, size_t input_len) {
+ 
+-	unsigned char* p_sei = sei_mdcv_data;
+-	for (i = 0; i < 3; i++) {
+-		for (j = 0; j < 2; j++) {
+-			hevc->primaries[i][j] = (*p_sei<<8) | *(p_sei+1);
+-			p_sei += 2;
+-		}
+-	}
+-	for (i = 0; i < 2; i++) {
+-		hevc->white_point[i] = (*p_sei<<8) | *(p_sei+1);
+-		p_sei += 2;
+-	}
+-	for (i = 0; i < 2; i++) {
+-		hevc->luminance[i] = (*p_sei<<24)
+-						| (*(p_sei+1)<<16)
+-						| (*(p_sei+2)<<8)
+-						| *(p_sei+3);
+-		p_sei += 4;
+-	}
+-	hevc->sei_present_flag |= SEI_MASTER_DISPLAY_COLOR_MASK;
++  if (!hevc || !input || input_len < 11) return;
++
++  unsigned char* ateme_id_pos = memmem(input, input_len, ATEME_ID, ATEME_ID_LEN);
++  if (!ateme_id_pos) return;
++
++  size_t start_pos = (ateme_id_pos - input) + ATEME_ID_LEN;
++  if (start_pos >= input_len) return;
++
++  // Reset input to be past the ATEME_ID.
++  input += start_pos;
++  input_len -= start_pos;
++
++  // Find SEI end marker 0x80, can only have trailing 0x00 after the end marker, no other values.
++  size_t end_offset = input_len - 1;
++  while ((end_offset > 0) && (input[end_offset] == 0x00)) end_offset--;
++  if ((end_offset == 0) || (input[end_offset] != 0x80)) return;
++
++  // Forward scan for valid SEI patterns of interest.
++  size_t curr_pos = 0;
++  while (curr_pos < (end_offset - 1)) {
++
++    unsigned char sei_type = input[curr_pos];
++    unsigned char sei_length = input[curr_pos + 1];
++    bool sei_match = false;
++
++    // Quick check if this could be a valid SEI
++    switch (sei_type) {
++      case SEI_MasteringDisplayColorVolume:
++        sei_match = (sei_length == SEI_MDCV_LENGTH);
++        break;
++      case SEI_ContentLightLevel:
++        sei_match = (sei_length == SEI_CLL_LENGTH);
++        break;
++      case SEI_Alternative_Transfer_Characteristics:
++        sei_match = (sei_length == SEI_ATC_LENGTH);
++        break;
++    }
+ 
+-	p_sei = sei_cll_data;
+-	hevc->content_light_level[0] = (*p_sei<<8) | *(p_sei+1);
+-	p_sei += 2;
+-	hevc->content_light_level[1] = (*p_sei<<8) | *(p_sei+1);
+-	p_sei += 2;
+-	hevc->sei_present_flag |= SEI_CONTENT_LIGHT_LEVEL_MASK;
++    if (sei_match) {
++      // Found potential SEI, further validate there is a chain of SEI to end.
++      size_t chain_pos = curr_pos;
++      bool valid_chain = true;
++
++      while (chain_pos < end_offset) {
++        unsigned char chain_length = input[chain_pos + 1];
++        size_t total_size = 2 + chain_length;
++
++        if ((chain_pos + total_size) > end_offset) {
++          valid_chain = false;
++          break;
++        }
++                
++        chain_pos += total_size;
++      }
++
++      if (valid_chain && (chain_pos == end_offset)) {
++        // Valid chain found, process the SEI
++        switch (sei_type) {
++          case SEI_MasteringDisplayColorVolume:
++            process_mdcv_sei(hevc, &input[curr_pos + 2]);
++            break;
++          case SEI_ContentLightLevel:
++            process_cll_sei(hevc, &input[curr_pos + 2]);
++            break;
++          case SEI_Alternative_Transfer_Characteristics:
++            process_atc_sei(hevc, &input[curr_pos + 2]);
++            break;
++        }
++        curr_pos += (2 + sei_length);
++        continue;
++      }
++		}
++
++    curr_pos++;
++  }
+ }
+ 
+ static void set_frame_info(struct hevc_state_s *hevc, struct vframe_s *vf,
+-- 
+2.48.1
+
+
+From 86b413d86fbee1ecc4fd1cff744ddbd2b1a77d4f Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Sat, 1 Mar 2025 02:34:28 +0000
+Subject: [PATCH 3/8] vh265: set_frame_info use get_unaligned_be32
+
+---
+ drivers/frame_provider/decoder/h265/vh265.c | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/frame_provider/decoder/h265/vh265.c b/drivers/frame_provider/decoder/h265/vh265.c
+index d463f6d3..4e9307b7 100644
+--- a/drivers/frame_provider/decoder/h265/vh265.c
++++ b/drivers/frame_provider/decoder/h265/vh265.c
+@@ -15,8 +15,12 @@
+  *
+  */
+ #define DEBUG
++
++#include <asm/unaligned.h>
++
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/string.h>
+ #include <linux/types.h>
+ #include <linux/errno.h>
+ #include <linux/interrupt.h>
+@@ -49,10 +53,6 @@
+ #include "../utils/vdec_v4l2_buffer_ops.h"
+ #include <media/v4l2-mem2mem.h>
+ 
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/string.h>
+-
+ /*
+ to enable DV of frame mode
+ #define DOLBY_META_SUPPORT in ucode
+@@ -9070,14 +9070,10 @@ static void set_frame_info(struct hevc_state_s *hevc, struct vframe_s *vf,
+ 		p = pic->aux_data_buf;
+ 		while (p < pic->aux_data_buf
+ 			+ pic->aux_data_size - 8) {
+-			size = *p++;
+-			size = (size << 8) | *p++;
+-			size = (size << 8) | *p++;
+-			size = (size << 8) | *p++;
+-			type = *p++;
+-			type = (type << 8) | *p++;
+-			type = (type << 8) | *p++;
+-			type = (type << 8) | *p++;
++			size = get_unaligned_be32(p);
++			p += 4;
++			type = get_unaligned_be32(p);
++			p += 4;
+ 			if (type == 0x02000000) {
+ 				/* hevc_print(hevc, 0,
+ 				"sei(%d)\n", size); */
+-- 
+2.48.1
+
+
+From a5f4c146dd569ab3c0b4d85cf8cfdfaf88732b3e Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Sun, 2 Mar 2025 08:15:06 +0000
+Subject: [PATCH 4/8] vh265: remove commented code
+
+---
+ drivers/frame_provider/decoder/h265/vh265.c | 133 +-------------------
+ 1 file changed, 3 insertions(+), 130 deletions(-)
+
+diff --git a/drivers/frame_provider/decoder/h265/vh265.c b/drivers/frame_provider/decoder/h265/vh265.c
+index 4e9307b7..305d7e75 100644
+--- a/drivers/frame_provider/decoder/h265/vh265.c
++++ b/drivers/frame_provider/decoder/h265/vh265.c
+@@ -2536,33 +2536,7 @@ static void restore_decode_state(struct hevc_state_s *hevc)
+ 		release_aux_data(hevc, hevc->decoding_pic);
+ 		hevc->decoding_pic = NULL;
+ 	}
+-	/*if (vdec_stream_based(vdec) &&
+-		(hevc->decode_idx - hevc->decode_idx_bak > 1)) {
+-		int i;
+-		hevc_print(hevc, 0, "decode_idx %d, decode_idx_bak %d\n",
+-								hevc->decode_idx, hevc->decode_idx_bak);
+-		for (i = 0; i < MAX_REF_PIC_NUM; i++) {
+-			struct PIC_s *pic;
+-			pic = hevc->m_PIC[i];
+-			if (pic == NULL ||
+-				(pic->index == -1) ||
+-				(pic->BUF_index == -1) ||
+-				(pic->POC == INVALID_POC))
+-				continue;
+-			if ((pic->decode_idx >= hevc->decode_idx_bak) &&
+-					pic->decode_idx != (hevc->decode_idx - 1)) {
+-					hevc_print(hevc, 0, "release error buffer\n");
+-					pic->error_mark = 0;
+-					pic->output_ready = 0;
+-					pic->show_frame = false;
+-					pic->output_mark = 0;
+-					pic->referenced = 0;
+-					pic->POC = INVALID_POC;
+-					put_mv_buf(hevc, pic);
+-					release_aux_data(hevc, pic);
+-			}
+-		}
+-	}*/
++
+ 	hevc->decode_idx = hevc->decode_idx_bak;
+ 	hevc->m_pocRandomAccess = hevc->m_pocRandomAccess_bak;
+ 	hevc->curr_POC = hevc->curr_POC_bak;
+@@ -2575,8 +2549,6 @@ static void restore_decode_state(struct hevc_state_s *hevc)
+ 
+ 	if (hevc->pic_list_init_flag == 1)
+ 		hevc->pic_list_init_flag = 0;
+-	/*if (hevc->decode_idx == 0)
+-		hevc->start_decoding_flag = 0;*/
+ 
+ 	hevc->slice_idx = 0;
+ 	hevc->used_4k_num = -1;
+@@ -2605,8 +2577,7 @@ static void hevc_init_stru(struct hevc_state_s *hevc,
+ 	hevc->new_tile = 0;
+ 	hevc->iPrevPOC = 0;
+ 	hevc->list_no = 0;
+-	/* int m_uiMaxCUWidth = 1<<7; */
+-	/* int m_uiMaxCUHeight = 1<<7; */
++
+ 	hevc->m_pocRandomAccess = MAX_INT;
+ 	hevc->tile_enabled = 0;
+ 	hevc->tile_x = 0;
+@@ -4689,11 +4660,6 @@ static void set_ref_pic_list(struct hevc_state_s *hevc, union param_u *params)
+ 				RefPicSetStCurr0[num_neg] =
+ 					pic->POC - ((1 << (RPS_USED_BIT - 1)) -
+ 								delt);
+-				/* hevc_print(hevc, 0,
+-				 *	"RefPicSetStCurr0 %x %x %x\n",
+-				 *   RefPicSetStCurr0[num_neg], pic->POC,
+-				 *   (0x800-(params[i]&0x7ff)));
+-				 */
+ 				num_neg++;
+ 			} else {
+ #ifdef SUPPORT_LONG_TERM_RPS
+@@ -4704,10 +4670,6 @@ static void set_ref_pic_list(struct hevc_state_s *hevc, union param_u *params)
+ 				}
+ #endif
+ 				RefPicSetStCurr1[num_pos] = pic->POC + delt;
+-				/* hevc_print(hevc, 0,
+-				 *	"RefPicSetStCurr1 %d\n",
+-				 *   RefPicSetStCurr1[num_pos]);
+-				 */
+ 				num_pos++;
+ 			}
+ 		}
+@@ -8681,11 +8643,6 @@ static int parse_sei(struct hevc_state_s *hevc,
+ 
+ 				break;
+ 			case SEI_MasteringDisplayColorVolume:
+-				/*hevc_print(hevc, 0,
+-					"sei type: primary display color volume %d, size %d\n",
+-					payload_type,
+-					payload_size);*/
+-				/* master_display_colour */
+ 				p_sei = p;
+ 				for (i = 0; i < 3; i++) {
+ 					for (j = 0; j < 2; j++) {
+@@ -8709,22 +8666,7 @@ static int parse_sei(struct hevc_state_s *hevc,
+ 						| *(p_sei+3);
+ 					p_sei += 4;
+ 				}
+-				hevc->sei_present_flag |=
+-					SEI_MASTER_DISPLAY_COLOR_MASK;
+-				/*for (i = 0; i < 3; i++)
+-					for (j = 0; j < 2; j++)
+-						hevc_print(hevc, 0,
+-						"\tprimaries[%1d][%1d] = %04x\n",
+-						i, j,
+-						hevc->primaries[i][j]);
+-				hevc_print(hevc, 0,
+-					"\twhite_point = (%04x, %04x)\n",
+-					hevc->white_point[0],
+-					hevc->white_point[1]);
+-				hevc_print(hevc, 0,
+-					"\tmax,min luminance = %08x, %08x\n",
+-					hevc->luminance[0],
+-					hevc->luminance[1]);*/
++				hevc->sei_present_flag |= SEI_MASTER_DISPLAY_COLOR_MASK;
+ 				break;
+ 			case SEI_ContentLightLevel:
+ 				if (get_dbg_flag(hevc) & H265_DEBUG_PRINT_SEI)
+@@ -8756,75 +8698,6 @@ static int parse_sei(struct hevc_state_s *hevc,
+ 	return 0;
+ }
+ 
+-/*
+-static unsigned calc_ar(unsigned idc, unsigned sar_w, unsigned sar_h,
+-			unsigned w, unsigned h)
+-{
+-	unsigned ar;
+-
+-	if (idc	== 255) {
+-		ar = div_u64(256ULL * sar_h * h,
+-				sar_w * w);
+-	} else {
+-		switch (idc) {
+-		case 1:
+-			ar = 0x100 * h / w;
+-			break;
+-		case 2:
+-			ar = 0x100 * h * 11 / (w * 12);
+-			break;
+-		case 3:
+-			ar = 0x100 * h * 11 / (w * 10);
+-			break;
+-		case 4:
+-			ar = 0x100 * h * 11 / (w * 16);
+-			break;
+-		case 5:
+-			ar = 0x100 * h * 33 / (w * 40);
+-			break;
+-		case 6:
+-			ar = 0x100 * h * 11 / (w * 24);
+-			break;
+-		case 7:
+-			ar = 0x100 * h * 11 / (w * 20);
+-			break;
+-		case 8:
+-			ar = 0x100 * h * 11 / (w * 32);
+-			break;
+-		case 9:
+-			ar = 0x100 * h * 33 / (w * 80);
+-			break;
+-		case 10:
+-			ar = 0x100 * h * 11 / (w * 18);
+-			break;
+-		case 11:
+-			ar = 0x100 * h * 11 / (w * 15);
+-			break;
+-		case 12:
+-			ar = 0x100 * h * 33 / (w * 64);
+-			break;
+-		case 13:
+-			ar = 0x100 * h * 99 / (w * 160);
+-			break;
+-		case 14:
+-			ar = 0x100 * h * 3 / (w * 4);
+-			break;
+-		case 15:
+-			ar = 0x100 * h * 2 / (w * 3);
+-			break;
+-		case 16:
+-			ar = 0x100 * h * 1 / (w * 2);
+-			break;
+-		default:
+-			ar = h * 0x100 / w;
+-			break;
+-		}
+-	}
+-
+-	return ar;
+-}
+-*/
+-
+ void *memmem(const void *haystack, size_t n, const void *needle, size_t m)
+ {
+ 	if (m > n || !m || !n)
+-- 
+2.48.1
+
+
+From e3f53a00d7e30f359ba245bb07ece64f93e7283a Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Sun, 2 Mar 2025 08:20:14 +0000
+Subject: [PATCH 5/8] vh265: use get/put_unaligned_be32/16 functions
+
+---
+ drivers/frame_provider/decoder/h265/vh265.c | 73 +++++++--------------
+ 1 file changed, 25 insertions(+), 48 deletions(-)
+
+diff --git a/drivers/frame_provider/decoder/h265/vh265.c b/drivers/frame_provider/decoder/h265/vh265.c
+index 305d7e75..cb5b0811 100644
+--- a/drivers/frame_provider/decoder/h265/vh265.c
++++ b/drivers/frame_provider/decoder/h265/vh265.c
+@@ -6658,21 +6658,9 @@ static void set_aux_data(struct hevc_state_s *hevc,
+ 					else
+ 						valid_tag = 0;
+ 					if (valid_tag && len > 0) {
+-						pic->aux_data_size +=
+-						(len + 8);
+-						h[0] = (len >> 24)
+-						& 0xff;
+-						h[1] = (len >> 16)
+-						& 0xff;
+-						h[2] = (len >> 8)
+-						& 0xff;
+-						h[3] = (len >> 0)
+-						& 0xff;
+-						h[6] =
+-						(padding_len >> 8)
+-						& 0xff;
+-						h[7] = (padding_len)
+-						& 0xff;
++						pic->aux_data_size += (len + 8);
++						put_unaligned_be32(len, h);
++						put_unaligned_be16(padding_len, h + 6);
+ 						h += (len + 8);
+ 						p += 8;
+ 						len = 0;
+@@ -8584,6 +8572,7 @@ static int parse_sei(struct hevc_state_s *hevc,
+ 		
+ 		if (p+payload_size <= sei_buf+size) {
+ 			switch (payload_type) {
++
+ 			case SEI_PicTiming:
+ 				if ((parser_sei_enable & 0x4) &&
+ 					hevc->frame_field_info_present_flag) {
+@@ -8598,6 +8587,7 @@ static int parse_sei(struct hevc_state_s *hevc,
+ 					}
+ 				}
+ 				break;
++
+ 			case SEI_UserDataITU_T_T35:
+ 				p_sei = p;
+ 				if (p_sei[0] == 0xB5
+@@ -8642,32 +8632,26 @@ static int parse_sei(struct hevc_state_s *hevc,
+ 				}
+ 
+ 				break;
++
+ 			case SEI_MasteringDisplayColorVolume:
+ 				p_sei = p;
+ 				for (i = 0; i < 3; i++) {
+ 					for (j = 0; j < 2; j++) {
+-						hevc->primaries[i][j]
+-							= (*p_sei<<8)
+-							| *(p_sei+1);
++						hevc->primaries[i][j] = get_unaligned_be16(p_sei);
+ 						p_sei += 2;
+ 					}
+ 				}
+ 				for (i = 0; i < 2; i++) {
+-					hevc->white_point[i]
+-						= (*p_sei<<8)
+-						| *(p_sei+1);
++					hevc->white_point[i] = get_unaligned_be16(p_sei);
+ 					p_sei += 2;
+ 				}
+ 				for (i = 0; i < 2; i++) {
+-					hevc->luminance[i]
+-						= (*p_sei<<24)
+-						| (*(p_sei+1)<<16)
+-						| (*(p_sei+2)<<8)
+-						| *(p_sei+3);
++					hevc->luminance[i] = get_unaligned_be32(p_sei);
+ 					p_sei += 4;
+ 				}
+ 				hevc->sei_present_flag |= SEI_MASTER_DISPLAY_COLOR_MASK;
+ 				break;
++
+ 			case SEI_ContentLightLevel:
+ 				if (get_dbg_flag(hevc) & H265_DEBUG_PRINT_SEI)
+ 					hevc_print(hevc, 0,
+@@ -8675,14 +8659,10 @@ static int parse_sei(struct hevc_state_s *hevc,
+ 					payload_type, payload_size);
+ 				/* content_light_level */
+ 				p_sei = p;
+-				hevc->content_light_level[0]
+-					= (*p_sei<<8) | *(p_sei+1);
++				hevc->content_light_level[0] = get_unaligned_be16(p_sei);
+ 				p_sei += 2;
+-				hevc->content_light_level[1]
+-					= (*p_sei<<8) | *(p_sei+1);
+-				p_sei += 2;
+-				hevc->sei_present_flag |=
+-					SEI_CONTENT_LIGHT_LEVEL_MASK;
++				hevc->content_light_level[1] = get_unaligned_be16(p_sei);
++				hevc->sei_present_flag |= SEI_CONTENT_LIGHT_LEVEL_MASK;
+ 				if (get_dbg_flag(hevc) & H265_DEBUG_PRINT_SEI)
+ 					hevc_print(hevc, 0,
+ 						"\tmax cll = %04x, max_pa_cll = %04x\n",
+@@ -8761,31 +8741,28 @@ void alt_hlg_parse_sei(struct hevc_state_s *hevc, unsigned char* input, size_t i
+ static void process_mdcv_sei(struct hevc_state_s *hevc, const unsigned char* data) {
+ 
+   const unsigned char* p_sei = data;
+-	int color;
+-	int coord;
+-	int type;
++  int color;
++  int coord;
++  int type;
+ 
+   // Process display primaries (RGB coordinates)
+   for (color = 0; color < 3; color++) {
+     for (coord = 0; coord < 2; coord++) {
+-      hevc->primaries[color][coord] = (p_sei[0] << 8) | p_sei[1];
++      hevc->primaries[color][coord] = get_unaligned_be16(p_sei);
+       p_sei += 2;
+     }
+   }
+ 
+   // Process white point coordinates
+   for (coord = 0; coord < 2; coord++) {
+-    hevc->white_point[coord] = (p_sei[0] << 8) | p_sei[1];
++    hevc->white_point[coord] = get_unaligned_be16(p_sei);
+     p_sei += 2;
+   }
+ 
+   // Process min/max luminance values
+   for (type = 0; type < 2; type++) {
+-    hevc->luminance[type] = (p_sei[0] << 24) | 
+-                            (p_sei[1] << 16) |
+-                            (p_sei[2] << 8)  |
+-                             p_sei[3];
+-  p_sei += 4;
++    hevc->luminance[type] = get_unaligned_be32(p_sei);
++    p_sei += 4;
+   }
+ 
+   hevc->sei_present_flag |= SEI_MASTER_DISPLAY_COLOR_MASK;
+@@ -8794,14 +8771,14 @@ static void process_mdcv_sei(struct hevc_state_s *hevc, const unsigned char* dat
+ static void process_cll_sei(struct hevc_state_s *hevc, const unsigned char* data) {
+ 
+   const unsigned char* p_sei = data;
+-    
++
+   // Process max content light level
+-  hevc->content_light_level[0] = (p_sei[0] << 8) | p_sei[1];
++  hevc->content_light_level[0] = get_unaligned_be16(p_sei);
+   p_sei += 2;
+-    
++
+   // Process max frame average light level
+-  hevc->content_light_level[1] = (p_sei[0] << 8) | p_sei[1];
+-    
++  hevc->content_light_level[1] = get_unaligned_be16(p_sei);
++
+   hevc->sei_present_flag |= SEI_CONTENT_LIGHT_LEVEL_MASK;
+ }
+ 
+-- 
+2.48.1
+
+
+From e4d82d852d1e972d0e8c98a4cc26f65f7195b2c5 Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Sun, 2 Mar 2025 08:26:01 +0000
+Subject: [PATCH 6/8] vh265: rework convUnc8x4blk
+
+---
+ drivers/frame_provider/decoder/h265/vh265.c | 334 ++++++++++++--------
+ 1 file changed, 195 insertions(+), 139 deletions(-)
+
+diff --git a/drivers/frame_provider/decoder/h265/vh265.c b/drivers/frame_provider/decoder/h265/vh265.c
+index cb5b0811..278717ba 100644
+--- a/drivers/frame_provider/decoder/h265/vh265.c
++++ b/drivers/frame_provider/decoder/h265/vh265.c
+@@ -2701,146 +2701,202 @@ static void uninit_detrefill_buf(struct hevc_state_s *hevc)
+ static void convUnc8x4blk(uint16_t* blk8x4Luma,
+ 	uint16_t* blk8x4Cb, uint16_t* blk8x4Cr, uint16_t* cmBodyBuf, int32_t direction)
+ {
++	const uint16_t mask = 0x3ff;  // 10-bit mask
++
+ 	if (direction == 0) {
+-		blk8x4Luma[3 + 0 * 8] = ((cmBodyBuf[0] >> 0)) & 0x3ff;
+-		blk8x4Luma[3 + 1 * 8] = ((cmBodyBuf[1] << 6)
+-			| (cmBodyBuf[0] >> 10)) & 0x3ff;
+-		blk8x4Luma[3 + 2 * 8] = ((cmBodyBuf[1] >> 4)) & 0x3ff;
+-		blk8x4Luma[3 + 3 * 8] = ((cmBodyBuf[2] << 2)
+-			| (cmBodyBuf[1] >> 14)) & 0x3ff;
+-		blk8x4Luma[7 + 0 * 8] = ((cmBodyBuf[3] << 8)
+-			| (cmBodyBuf[2] >> 8)) & 0x3ff;
+-		blk8x4Luma[7 + 1 * 8] = ((cmBodyBuf[3] >> 2)) & 0x3ff;
+-		blk8x4Luma[7 + 2 * 8] = ((cmBodyBuf[4] << 4)
+-			| (cmBodyBuf[3] >> 12)) & 0x3ff;
+-		blk8x4Luma[7 + 3 * 8] = ((cmBodyBuf[4] >> 6)) & 0x3ff;
+-		blk8x4Cb  [0 + 0 * 4] = ((cmBodyBuf[5] >> 0)) & 0x3ff;
+-		blk8x4Cr  [0 + 0 * 4] = ((cmBodyBuf[6]	<< 6)
+-			| (cmBodyBuf[5] >> 10)) & 0x3ff;
+-		blk8x4Cb  [0 + 1 * 4] = ((cmBodyBuf[6] >> 4)) & 0x3ff;
+-		blk8x4Cr  [0 + 1 * 4] = ((cmBodyBuf[7] << 2)
+-			| (cmBodyBuf[6] >> 14)) & 0x3ff;
+-
+-		blk8x4Luma[0 + 0 * 8] = ((cmBodyBuf[0 + 8] >> 0)) & 0x3ff;
+-		blk8x4Luma[1 + 0 * 8] = ((cmBodyBuf[1 + 8] << 6) |
+-			(cmBodyBuf[0 + 8] >> 10)) & 0x3ff;
+-		blk8x4Luma[2 + 0 * 8] = ((cmBodyBuf[1 + 8] >> 4)) & 0x3ff;
+-		blk8x4Luma[0 + 1 * 8] = ((cmBodyBuf[2 + 8] << 2) |
+-			(cmBodyBuf[1 + 8] >> 14)) & 0x3ff;
+-		blk8x4Luma[1 + 1 * 8] = ((cmBodyBuf[3 + 8] << 8) |
+-			(cmBodyBuf[2 + 8] >> 8)) & 0x3ff;
+-		blk8x4Luma[2 + 1 * 8] = ((cmBodyBuf[3 + 8] >> 2)) & 0x3ff;
+-		blk8x4Luma[0 + 2 * 8] = ((cmBodyBuf[4 + 8] << 4) |
+-			(cmBodyBuf[3 + 8] >> 12)) & 0x3ff;
+-		blk8x4Luma[1 + 2 * 8] = ((cmBodyBuf[4 + 8] >> 6)) & 0x3ff;
+-		blk8x4Luma[2 + 2 * 8] = ((cmBodyBuf[5 + 8] >> 0)) & 0x3ff;
+-		blk8x4Luma[0 + 3 * 8] = ((cmBodyBuf[6 + 8] << 6) |
+-			(cmBodyBuf[5 + 8] >> 10)) & 0x3ff;
+-		blk8x4Luma[1 + 3 * 8] = ((cmBodyBuf[6 + 8] >> 4)) & 0x3ff;
+-		blk8x4Luma[2 + 3 * 8] = ((cmBodyBuf[7 + 8] << 2) |
+-			(cmBodyBuf[6 + 8] >> 14)) & 0x3ff;
+-
+-		blk8x4Luma[4 + 0 * 8] = ((cmBodyBuf[0 + 16] >> 0)) & 0x3ff;
+-		blk8x4Luma[5 + 0 * 8] = ((cmBodyBuf[1 + 16] << 6) |
+-			(cmBodyBuf[0 + 16] >> 10)) & 0x3ff;
+-		blk8x4Luma[6 + 0 * 8] = ((cmBodyBuf[1 + 16] >> 4)) & 0x3ff;
+-		blk8x4Luma[4 + 1 * 8] = ((cmBodyBuf[2 + 16] << 2) |
+-			(cmBodyBuf[1 + 16] >> 14)) & 0x3ff;
+-		blk8x4Luma[5 + 1 * 8] = ((cmBodyBuf[3 + 16] << 8) |
+-			(cmBodyBuf[2 + 16] >> 8)) & 0x3ff;
+-		blk8x4Luma[6 + 1 * 8] = ((cmBodyBuf[3 + 16] >> 2)) & 0x3ff;
+-		blk8x4Luma[4 + 2 * 8] = ((cmBodyBuf[4 + 16] << 4) |
+-			(cmBodyBuf[3 + 16] >> 12)) & 0x3ff;
+-		blk8x4Luma[5 + 2 * 8] = ((cmBodyBuf[4 + 16] >> 6)) & 0x3ff;
+-		blk8x4Luma[6 + 2 * 8] = ((cmBodyBuf[5 + 16] >> 0)) & 0x3ff;
+-		blk8x4Luma[4 + 3 * 8] = ((cmBodyBuf[6 + 16] << 6) |
+-			(cmBodyBuf[5 + 16] >> 10)) & 0x3ff;
+-		blk8x4Luma[5 + 3 * 8] = ((cmBodyBuf[6 + 16] >> 4)) & 0x3ff;
+-		blk8x4Luma[6 + 3 * 8] = ((cmBodyBuf[7 + 16] << 2) |
+-			(cmBodyBuf[6 + 16] >> 14)) & 0x3ff;
+-
+-		blk8x4Cb[1 + 0 * 4] = ((cmBodyBuf[0 + 24] >> 0)) & 0x3ff;
+-		blk8x4Cr[1 + 0 * 4] = ((cmBodyBuf[1 + 24] << 6) |
+-			(cmBodyBuf[0 + 24] >> 10)) & 0x3ff;
+-		blk8x4Cb[2 + 0 * 4] = ((cmBodyBuf[1 + 24] >> 4)) & 0x3ff;
+-		blk8x4Cr[2 + 0 * 4] = ((cmBodyBuf[2 + 24] << 2) |
+-			(cmBodyBuf[1 + 24] >> 14)) & 0x3ff;
+-		blk8x4Cb[3 + 0 * 4] = ((cmBodyBuf[3 + 24] << 8) |
+-			(cmBodyBuf[2 + 24] >> 8)) & 0x3ff;
+-		blk8x4Cr[3 + 0 * 4] = ((cmBodyBuf[3 + 24] >> 2)) & 0x3ff;
+-		blk8x4Cb[1 + 1 * 4] = ((cmBodyBuf[4 + 24] << 4) |
+-			(cmBodyBuf[3 + 24] >> 12)) & 0x3ff;
+-		blk8x4Cr[1 + 1 * 4] = ((cmBodyBuf[4 + 24] >> 6)) & 0x3ff;
+-		blk8x4Cb[2 + 1 * 4] = ((cmBodyBuf[5 + 24] >> 0)) & 0x3ff;
+-		blk8x4Cr[2 + 1 * 4] = ((cmBodyBuf[6 + 24] << 6) |
+-			(cmBodyBuf[5 + 24] >> 10)) & 0x3ff;
+-		blk8x4Cb[3 + 1 * 4] = ((cmBodyBuf[6 + 24] >> 4)) & 0x3ff;
+-		blk8x4Cr[3 + 1 * 4] = ((cmBodyBuf[7 + 24] << 2) |
+-			(cmBodyBuf[6 + 24] >> 14)) & 0x3ff;
+-	} else {
+-		cmBodyBuf[0 + 8 * 0] = (blk8x4Luma[3 + 1 * 8] << 10) |
+-			blk8x4Luma[3 + 0 * 8];
+-		cmBodyBuf[1 + 8 * 0] = (blk8x4Luma[3 + 3 * 8] << 14) |
+-			(blk8x4Luma[3 + 2 * 8] << 4) | (blk8x4Luma[3 + 1 * 8] >> 6);
+-		cmBodyBuf[2 + 8 * 0] = (blk8x4Luma[7 + 0 * 8] << 8) |
+-			(blk8x4Luma[3 + 3 * 8] >> 2);
+-		cmBodyBuf[3 + 8 * 0] = (blk8x4Luma[7 + 2 * 8] << 12) |
+-			(blk8x4Luma[7 + 1 * 8] << 2) | (blk8x4Luma[7 + 0 * 8] >>8);
+-		cmBodyBuf[4 + 8 * 0] = (blk8x4Luma[7 + 3 * 8] << 6) |
+-			(blk8x4Luma[7 + 2 * 8] >>4);
+-		cmBodyBuf[5 + 8 * 0] = (blk8x4Cr[0 + 0 * 4] << 10) |
+-			blk8x4Cb[0 + 0 * 4];
+-		cmBodyBuf[6 + 8 * 0] = (blk8x4Cr[0 + 1 * 4] << 14) |
+-			(blk8x4Cb[0 + 1 * 4] << 4)   | (blk8x4Cr[0 + 0 * 4] >> 6);
+-		cmBodyBuf[7 + 8 * 0] = (0<< 8) | (blk8x4Cr[0 + 1 * 4] >> 2);
+-
+-		cmBodyBuf[0 + 8 * 1] = (blk8x4Luma[1 + 0 * 8] << 10) |
+-			blk8x4Luma[0 + 0 * 8];
+-		cmBodyBuf[1 + 8 * 1] = (blk8x4Luma[0 + 1 * 8] << 14) |
+-			(blk8x4Luma[2 + 0 * 8] << 4) | (blk8x4Luma[1 + 0 * 8] >> 6);
+-		cmBodyBuf[2 + 8 * 1] = (blk8x4Luma[1 + 1 * 8] << 8) |
+-			(blk8x4Luma[0 + 1 * 8] >> 2);
+-		cmBodyBuf[3 + 8 * 1] = (blk8x4Luma[0 + 2 * 8] << 12) |
+-			(blk8x4Luma[2 + 1 * 8] << 2) | (blk8x4Luma[1 + 1 * 8] >>8);
+-		cmBodyBuf[4 + 8 * 1] = (blk8x4Luma[1 + 2 * 8] << 6) |
+-			(blk8x4Luma[0 + 2 * 8] >>4);
+-		cmBodyBuf[5 + 8 * 1] = (blk8x4Luma[0 + 3 * 8] << 10) |
+-			blk8x4Luma[2 + 2 * 8];
+-		cmBodyBuf[6 + 8 * 1] = (blk8x4Luma[2 + 3 * 8] << 14) |
+-			(blk8x4Luma[1 + 3 * 8] << 4) | (blk8x4Luma[0 + 3 * 8] >> 6);
+-		cmBodyBuf[7 + 8 * 1] = (0<< 8) | (blk8x4Luma[2 + 3 * 8] >> 2);
+-
+-		cmBodyBuf[0 + 8 * 2] = (blk8x4Luma[5 + 0 * 8] << 10) |
+-			blk8x4Luma[4 + 0 * 8];
+-		cmBodyBuf[1 + 8 * 2] = (blk8x4Luma[4 + 1 * 8] << 14) |
+-			(blk8x4Luma[6 + 0 * 8] << 4) | (blk8x4Luma[5 + 0 * 8] >> 6);
+-		cmBodyBuf[2 + 8 * 2] = (blk8x4Luma[5 + 1 * 8] << 8) |
+-			(blk8x4Luma[4 + 1 * 8] >> 2);
+-		cmBodyBuf[3 + 8 * 2] = (blk8x4Luma[4 + 2 * 8] << 12) |
+-			(blk8x4Luma[6 + 1 * 8] << 2) | (blk8x4Luma[5 + 1 * 8] >>8);
+-		cmBodyBuf[4 + 8 * 2] = (blk8x4Luma[5 + 2 * 8] << 6) |
+-			(blk8x4Luma[4 + 2 * 8] >>4);
+-		cmBodyBuf[5 + 8 * 2] = (blk8x4Luma[4 + 3 * 8] << 10) |
+-			blk8x4Luma[6 + 2 * 8];
+-		cmBodyBuf[6 + 8 * 2] = (blk8x4Luma[6 + 3 * 8] << 14) |
+-			(blk8x4Luma[5 + 3 * 8] << 4) | (blk8x4Luma[4 + 3 * 8] >> 6);
+-		cmBodyBuf[7 + 8 * 2] = (0<< 8) | (blk8x4Luma[6 + 3 * 8] >> 2);
+-
+-		cmBodyBuf[0 + 8 * 3] = (blk8x4Cr[1 + 0 * 4] << 10) |
+-			blk8x4Cb[1 + 0 * 4];
+-		cmBodyBuf[1 + 8 * 3] = (blk8x4Cr[2 + 0 * 4] << 14) |
+-			(blk8x4Cb[2 + 0 * 4] << 4) | (blk8x4Cr[1 + 0 * 4] >> 6);
+-		cmBodyBuf[2 + 8 * 3] = (blk8x4Cb[3 + 0 * 4] << 8) |
+-			(blk8x4Cr[2 + 0 * 4] >> 2);
+-		cmBodyBuf[3 + 8 * 3] = (blk8x4Cb[1 + 1 * 4] << 12) |
+-			(blk8x4Cr[3 + 0 * 4] << 2) | (blk8x4Cb[3 + 0 * 4] >>8);
+-		cmBodyBuf[4 + 8 * 3] = (blk8x4Cr[1 + 1 * 4] << 6) |
+-			(blk8x4Cb[1 + 1 * 4] >>4);
+-		cmBodyBuf[5 + 8 * 3] = (blk8x4Cr[2 + 1 * 4] << 10) |
+-			blk8x4Cb[2 + 1 * 4];
+-		cmBodyBuf[6 + 8 * 3] = (blk8x4Cr[3 + 1 * 4] << 14) |
+-			(blk8x4Cb[3 + 1 * 4] << 4) | (blk8x4Cr[2 + 1 * 4] >> 6);
+-		cmBodyBuf[7 + 8 * 3] = (0 << 8) | (blk8x4Cr[3 + 1 * 4] >> 2);
++
++		// Prefetch cmBodyBuf data for better cache usage on ARM
++		__builtin_prefetch(cmBodyBuf, 0);
++		__builtin_prefetch(cmBodyBuf + 8, 0);
++		__builtin_prefetch(cmBodyBuf + 16, 0);
++		__builtin_prefetch(cmBodyBuf + 24, 0);
++
++		uint16_t val0, val1, val2, val3, val4, val5, val6, val7;
++
++		val0 = cmBodyBuf[0];
++		val1 = cmBodyBuf[1];
++		val2 = cmBodyBuf[2];
++		val3 = cmBodyBuf[3];
++		val4 = cmBodyBuf[4];
++		val5 = cmBodyBuf[5];
++		val6 = cmBodyBuf[6];
++		val7 = cmBodyBuf[7];
++
++		blk8x4Luma[3 + 0 * 8] = (val0 >> 0) & mask;
++		blk8x4Luma[3 + 1 * 8] = ((val1 << 6) | (val0 >> 10)) & mask;
++		blk8x4Luma[3 + 2 * 8] = (val1 >> 4) & mask;
++		blk8x4Luma[3 + 3 * 8] = ((val2 << 2) | (val1 >> 14)) & mask;
++		blk8x4Luma[7 + 0 * 8] = ((val3 << 8) | (val2 >> 8)) & mask;
++		blk8x4Luma[7 + 1 * 8] = (val3 >> 2) & mask;
++		blk8x4Luma[7 + 2 * 8] = ((val4 << 4) | (val3 >> 12)) & mask;
++		blk8x4Luma[7 + 3 * 8] = (val4 >> 6) & mask;
++		blk8x4Cb[0 + 0 * 4] = (val5 >> 0) & mask;
++		blk8x4Cr[0 + 0 * 4] = ((val6 << 6) | (val5 >> 10)) & mask;
++		blk8x4Cb[0 + 1 * 4] = (val6 >> 4) & mask;
++		blk8x4Cr[0 + 1 * 4] = ((val7 << 2) | (val6 >> 14)) & mask;
++
++		// Block 2
++		val0 = cmBodyBuf[0 + 8];
++		val1 = cmBodyBuf[1 + 8];
++		val2 = cmBodyBuf[2 + 8];
++		val3 = cmBodyBuf[3 + 8];
++		val4 = cmBodyBuf[4 + 8];
++		val5 = cmBodyBuf[5 + 8];
++		val6 = cmBodyBuf[6 + 8];
++		val7 = cmBodyBuf[7 + 8];
++
++		blk8x4Luma[0 + 0 * 8] = (val0 >> 0) & mask;
++		blk8x4Luma[1 + 0 * 8] = ((val1 << 6) | (val0 >> 10)) & mask;
++		blk8x4Luma[2 + 0 * 8] = (val1 >> 4) & mask;
++		blk8x4Luma[0 + 1 * 8] = ((val2 << 2) | (val1 >> 14)) & mask;
++		blk8x4Luma[1 + 1 * 8] = ((val3 << 8) | (val2 >> 8)) & mask;
++		blk8x4Luma[2 + 1 * 8] = (val3 >> 2) & mask;
++		blk8x4Luma[0 + 2 * 8] = ((val4 << 4) | (val3 >> 12)) & mask;
++		blk8x4Luma[1 + 2 * 8] = (val4 >> 6) & mask;
++		blk8x4Luma[2 + 2 * 8] = (val5 >> 0) & mask;
++		blk8x4Luma[0 + 3 * 8] = ((val6 << 6) | (val5 >> 10)) & mask;
++		blk8x4Luma[1 + 3 * 8] = (val6 >> 4) & mask;
++		blk8x4Luma[2 + 3 * 8] = ((val7 << 2) | (val6 >> 14)) & mask;
++
++		// Block 3
++		val0 = cmBodyBuf[0 + 16];
++		val1 = cmBodyBuf[1 + 16];
++		val2 = cmBodyBuf[2 + 16];
++		val3 = cmBodyBuf[3 + 16];
++		val4 = cmBodyBuf[4 + 16];
++		val5 = cmBodyBuf[5 + 16];
++		val6 = cmBodyBuf[6 + 16];
++		val7 = cmBodyBuf[7 + 16];
++		
++		blk8x4Luma[4 + 0 * 8] = (val0 >> 0) & mask;
++		blk8x4Luma[5 + 0 * 8] = ((val1 << 6) | (val0 >> 10)) & mask;
++		blk8x4Luma[6 + 0 * 8] = (val1 >> 4) & mask;
++		blk8x4Luma[4 + 1 * 8] = ((val2 << 2) | (val1 >> 14)) & mask;
++		blk8x4Luma[5 + 1 * 8] = ((val3 << 8) | (val2 >> 8)) & mask;
++		blk8x4Luma[6 + 1 * 8] = (val3 >> 2) & mask;
++		blk8x4Luma[4 + 2 * 8] = ((val4 << 4) | (val3 >> 12)) & mask;
++		blk8x4Luma[5 + 2 * 8] = (val4 >> 6) & mask;
++		blk8x4Luma[6 + 2 * 8] = (val5 >> 0) & mask;
++		blk8x4Luma[4 + 3 * 8] = ((val6 << 6) | (val5 >> 10)) & mask;
++		blk8x4Luma[5 + 3 * 8] = (val6 >> 4) & mask;
++		blk8x4Luma[6 + 3 * 8] = ((val7 << 2) | (val6 >> 14)) & mask;
++
++		// Block 4
++		val0 = cmBodyBuf[0 + 24];
++		val1 = cmBodyBuf[1 + 24];
++		val2 = cmBodyBuf[2 + 24];
++		val3 = cmBodyBuf[3 + 24];
++		val4 = cmBodyBuf[4 + 24];
++		val5 = cmBodyBuf[5 + 24];
++		val6 = cmBodyBuf[6 + 24];
++		val7 = cmBodyBuf[7 + 24];
++		
++		blk8x4Cb[1 + 0 * 4] = (val0 >> 0) & mask;
++		blk8x4Cr[1 + 0 * 4] = ((val1 << 6) | (val0 >> 10)) & mask;
++		blk8x4Cb[2 + 0 * 4] = (val1 >> 4) & mask;
++		blk8x4Cr[2 + 0 * 4] = ((val2 << 2) | (val1 >> 14)) & mask;
++		blk8x4Cb[3 + 0 * 4] = ((val3 << 8) | (val2 >> 8)) & mask;
++		blk8x4Cr[3 + 0 * 4] = (val3 >> 2) & mask;
++		blk8x4Cb[1 + 1 * 4] = ((val4 << 4) | (val3 >> 12)) & mask;
++		blk8x4Cr[1 + 1 * 4] = (val4 >> 6) & mask;
++		blk8x4Cb[2 + 1 * 4] = (val5 >> 0) & mask;
++		blk8x4Cr[2 + 1 * 4] = ((val6 << 6) | (val5 >> 10)) & mask;
++		blk8x4Cb[3 + 1 * 4] = (val6 >> 4) & mask;
++		blk8x4Cr[3 + 1 * 4] = ((val7 << 2) | (val6 >> 14)) & mask;
++
++	} else { // Direction 1 - YUV to cmBodyBuf
++
++		uint16_t luma_3_0 = blk8x4Luma[3 + 0 * 8];
++		uint16_t luma_3_1 = blk8x4Luma[3 + 1 * 8];
++		uint16_t luma_3_2 = blk8x4Luma[3 + 2 * 8];
++		uint16_t luma_3_3 = blk8x4Luma[3 + 3 * 8];
++		uint16_t luma_7_0 = blk8x4Luma[7 + 0 * 8];
++		uint16_t luma_7_1 = blk8x4Luma[7 + 1 * 8];
++		uint16_t luma_7_2 = blk8x4Luma[7 + 2 * 8];
++		uint16_t luma_7_3 = blk8x4Luma[7 + 3 * 8];
++
++		uint16_t cb_0_0 = blk8x4Cb[0 + 0 * 4];
++		uint16_t cr_0_0 = blk8x4Cr[0 + 0 * 4];
++		uint16_t cb_0_1 = blk8x4Cb[0 + 1 * 4];
++		uint16_t cr_0_1 = blk8x4Cr[0 + 1 * 4];
++
++		cmBodyBuf[0 + 8 * 0] = (luma_3_1 << 10) | luma_3_0;
++		cmBodyBuf[1 + 8 * 0] = (luma_3_3 << 14) | (luma_3_2 << 4) | (luma_3_1 >> 6);
++		cmBodyBuf[2 + 8 * 0] = (luma_7_0 << 8) | (luma_3_3 >> 2);
++		cmBodyBuf[3 + 8 * 0] = (luma_7_2 << 12) | (luma_7_1 << 2) | (luma_7_0 >> 8);
++		cmBodyBuf[4 + 8 * 0] = (luma_7_3 << 6) | (luma_7_2 >> 4);
++		cmBodyBuf[5 + 8 * 0] = (cr_0_0 << 10) | cb_0_0;
++		cmBodyBuf[6 + 8 * 0] = (cr_0_1 << 14) | (cb_0_1 << 4) | (cr_0_0 >> 6);
++		cmBodyBuf[7 + 8 * 0] = (0 << 8) | (cr_0_1 >> 2);
++
++		// Block 2
++		uint16_t luma_0_0 = blk8x4Luma[0 + 0 * 8];
++		uint16_t luma_1_0 = blk8x4Luma[1 + 0 * 8];
++		uint16_t luma_2_0 = blk8x4Luma[2 + 0 * 8];
++		uint16_t luma_0_1 = blk8x4Luma[0 + 1 * 8];
++		uint16_t luma_1_1 = blk8x4Luma[1 + 1 * 8];
++		uint16_t luma_2_1 = blk8x4Luma[2 + 1 * 8];
++		uint16_t luma_0_2 = blk8x4Luma[0 + 2 * 8];
++		uint16_t luma_1_2 = blk8x4Luma[1 + 2 * 8];
++		uint16_t luma_2_2 = blk8x4Luma[2 + 2 * 8];
++		uint16_t luma_0_3 = blk8x4Luma[0 + 3 * 8];
++		uint16_t luma_1_3 = blk8x4Luma[1 + 3 * 8];
++		uint16_t luma_2_3 = blk8x4Luma[2 + 3 * 8];
++
++		cmBodyBuf[0 + 8 * 1] = (luma_1_0 << 10) | luma_0_0;
++		cmBodyBuf[1 + 8 * 1] = (luma_0_1 << 14) | (luma_2_0 << 4) | (luma_1_0 >> 6);
++		cmBodyBuf[2 + 8 * 1] = (luma_1_1 << 8) | (luma_0_1 >> 2);
++		cmBodyBuf[3 + 8 * 1] = (luma_0_2 << 12) | (luma_2_1 << 2) | (luma_1_1 >> 8);
++		cmBodyBuf[4 + 8 * 1] = (luma_1_2 << 6) | (luma_0_2 >> 4);
++		cmBodyBuf[5 + 8 * 1] = (luma_0_3 << 10) | luma_2_2;
++		cmBodyBuf[6 + 8 * 1] = (luma_2_3 << 14) | (luma_1_3 << 4) | (luma_0_3 >> 6);
++		cmBodyBuf[7 + 8 * 1] = (0 << 8) | (luma_2_3 >> 2);
++
++		// Block 3
++		uint16_t luma_4_0 = blk8x4Luma[4 + 0 * 8];
++		uint16_t luma_5_0 = blk8x4Luma[5 + 0 * 8];
++		uint16_t luma_6_0 = blk8x4Luma[6 + 0 * 8];
++		uint16_t luma_4_1 = blk8x4Luma[4 + 1 * 8];
++		uint16_t luma_5_1 = blk8x4Luma[5 + 1 * 8];
++		uint16_t luma_6_1 = blk8x4Luma[6 + 1 * 8];
++		uint16_t luma_4_2 = blk8x4Luma[4 + 2 * 8];
++		uint16_t luma_5_2 = blk8x4Luma[5 + 2 * 8];
++		uint16_t luma_6_2 = blk8x4Luma[6 + 2 * 8];
++		uint16_t luma_4_3 = blk8x4Luma[4 + 3 * 8];
++		uint16_t luma_5_3 = blk8x4Luma[5 + 3 * 8];
++		uint16_t luma_6_3 = blk8x4Luma[6 + 3 * 8];
++
++		cmBodyBuf[0 + 8 * 2] = (luma_5_0 << 10) | luma_4_0;
++		cmBodyBuf[1 + 8 * 2] = (luma_4_1 << 14) | (luma_6_0 << 4) | (luma_5_0 >> 6);
++		cmBodyBuf[2 + 8 * 2] = (luma_5_1 << 8) | (luma_4_1 >> 2);
++		cmBodyBuf[3 + 8 * 2] = (luma_4_2 << 12) | (luma_6_1 << 2) | (luma_5_1 >> 8);
++		cmBodyBuf[4 + 8 * 2] = (luma_5_2 << 6) | (luma_4_2 >> 4);
++		cmBodyBuf[5 + 8 * 2] = (luma_4_3 << 10) | luma_6_2;
++		cmBodyBuf[6 + 8 * 2] = (luma_6_3 << 14) | (luma_5_3 << 4) | (luma_4_3 >> 6);
++		cmBodyBuf[7 + 8 * 2] = (0 << 8) | (luma_6_3 >> 2);
++
++		// Block 4
++		uint16_t cb_1_0 = blk8x4Cb[1 + 0 * 4];
++		uint16_t cr_1_0 = blk8x4Cr[1 + 0 * 4];
++		uint16_t cb_2_0 = blk8x4Cb[2 + 0 * 4];
++		uint16_t cr_2_0 = blk8x4Cr[2 + 0 * 4];
++		uint16_t cb_3_0 = blk8x4Cb[3 + 0 * 4];
++		uint16_t cr_3_0 = blk8x4Cr[3 + 0 * 4];
++		uint16_t cb_1_1 = blk8x4Cb[1 + 1 * 4];
++		uint16_t cr_1_1 = blk8x4Cr[1 + 1 * 4];
++		uint16_t cb_2_1 = blk8x4Cb[2 + 1 * 4];
++		uint16_t cr_2_1 = blk8x4Cr[2 + 1 * 4];
++		uint16_t cb_3_1 = blk8x4Cb[3 + 1 * 4];
++		uint16_t cr_3_1 = blk8x4Cr[3 + 1 * 4];
++
++		cmBodyBuf[0 + 8 * 3] = (cr_1_0 << 10) | cb_1_0;
++		cmBodyBuf[1 + 8 * 3] = (cr_2_0 << 14) | (cb_2_0 << 4) | (cr_1_0 >> 6);
++		cmBodyBuf[2 + 8 * 3] = (cb_3_0 << 8) | (cr_2_0 >> 2);
++		cmBodyBuf[3 + 8 * 3] = (cb_1_1 << 12) | (cr_3_0 << 2) | (cb_3_0 >> 8);
++		cmBodyBuf[4 + 8 * 3] = (cr_1_1 << 6) | (cb_1_1 >> 4);
++		cmBodyBuf[5 + 8 * 3] = (cr_2_1 << 10) | cb_2_1;
++		cmBodyBuf[6 + 8 * 3] = (cr_3_1 << 14) | (cb_3_1 << 4) | (cr_2_1 >> 6);
++		cmBodyBuf[7 + 8 * 3] = (0 << 8) | (cr_3_1 >> 2);
+ 	}
+ }
+ 
+-- 
+2.48.1
+
+
+From ea75f3cb5a4ac7fc2e7816ea0fbfa94024c7ef62 Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Mon, 10 Mar 2025 15:18:02 +0800
+Subject: [PATCH 7/8] vvc1: Alternative - rework with OSMC Linux AMLogic GE2D
+ implementation plus other logic
+
+---
+ drivers/frame_provider/decoder/vc1/vvc1.c | 215 ++++++++++++++++------
+ 1 file changed, 154 insertions(+), 61 deletions(-)
+
+diff --git a/drivers/frame_provider/decoder/vc1/vvc1.c b/drivers/frame_provider/decoder/vc1/vvc1.c
+index c293a506..e60f04ac 100644
+--- a/drivers/frame_provider/decoder/vc1/vvc1.c
++++ b/drivers/frame_provider/decoder/vc1/vvc1.c
+@@ -46,6 +46,8 @@
+ #include "../../../common/chips/decoder_cpu_ver_info.h"
+ #include "../utils/vdec_feature.h"
+ 
++#include <linux/amlogic/media/ge2d/ge2d.h>
++
+ 
+ #define DRIVER_NAME "amvdec_vc1"
+ #define MODULE_NAME "amvdec_vc1"
+@@ -77,10 +79,13 @@
+ #define VC1_OFFSET_REG      AV_SCRATCH_C
+ #define MEM_OFFSET_REG      AV_SCRATCH_F
+ 
++#define CANVAS_INDEX_START	0x78
++
+ #define VF_POOL_SIZE		16
+ #define DECODE_BUFFER_NUM_MAX	4
++#define COPY_DECODE_BUFFER_NUM_MAX 16
+ #define WORKSPACE_SIZE		(2 * SZ_1M)
+-#define MAX_BMMU_BUFFER_NUM	(DECODE_BUFFER_NUM_MAX + 1)
++#define MAX_BMMU_BUFFER_NUM	(DECODE_BUFFER_NUM_MAX + COPY_DECODE_BUFFER_NUM_MAX + 1)
+ #define VF_BUFFER_IDX(n)	(1 + n)
+ #define DCAC_BUFF_START_ADDR	0x01f00000
+ 
+@@ -123,10 +128,8 @@ static DECLARE_KFIFO(display_q, struct vframe_s *, VF_POOL_SIZE);
+ static DECLARE_KFIFO(recycle_q, struct vframe_s *, VF_POOL_SIZE);
+ 
+ static struct vframe_s vfpool[VF_POOL_SIZE];
+-static struct vframe_s vfpool2[VF_POOL_SIZE];
+-static int cur_pool_idx;
+ 
+-static s32 vfbuf_use[DECODE_BUFFER_NUM_MAX];
++static s32 vfbuf_use[DECODE_BUFFER_NUM_MAX + COPY_DECODE_BUFFER_NUM_MAX];
+ static struct timer_list recycle_timer;
+ static u32 stat;
+ static u32 buf_size = 32 * 1024 * 1024;
+@@ -151,6 +154,7 @@ static struct work_struct set_clk_work;
+ static struct work_struct error_wd_work;
+ spinlock_t vc1_rp_lock;
+ 
++static struct ge2d_context_s *ge2d_vc1_context;
+ 
+ #ifdef DEBUG_PTS
+ static u32 pts_hit, pts_missed, pts_i_hit, pts_i_missed;
+@@ -159,6 +163,8 @@ static DEFINE_SPINLOCK(lock);
+ 
+ static struct dec_sysinfo vvc1_amstream_dec_info;
+ 
++static int force_frameint = 0;
++
+ struct frm_s {
+ 	int state;
+ 	u32 start_pts;
+@@ -182,16 +188,6 @@ enum {
+ #define DUR2PTS(x) ((x)*90/96)
+ #define PTS2DUR(x) ((x)*96/90)
+ 
+-static inline int pool_index(struct vframe_s *vf)
+-{
+-	if ((vf >= &vfpool[0]) && (vf <= &vfpool[VF_POOL_SIZE - 1]))
+-		return 0;
+-	else if ((vf >= &vfpool2[0]) && (vf <= &vfpool2[VF_POOL_SIZE - 1]))
+-		return 1;
+-	else
+-		return -1;
+-}
+-
+ static inline bool close_to(int a, int b, int m)
+ {
+ 	return abs(a - b) < m;
+@@ -199,16 +195,7 @@ static inline bool close_to(int a, int b, int m)
+ 
+ static inline u32 index2canvas(u32 index)
+ {
+-	const u32 canvas_tab[DECODE_BUFFER_NUM_MAX] = {
+-#if 1	/* ALWASY.MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON6 */
+-	0x010100, 0x030302, 0x050504, 0x070706/*,
+-	0x090908, 0x0b0b0a, 0x0d0d0c, 0x0f0f0e*/
+-#else
+-		0x020100, 0x050403, 0x080706, 0x0b0a09
+-#endif
+-	};
+-
+-	return canvas_tab[index];
++	return ((index * 2 + 1 + CANVAS_INDEX_START) << 16) | ((index * 2 + 1 + CANVAS_INDEX_START) << 8) | (index * 2 + CANVAS_INDEX_START);
+ }
+ 
+ static void set_aspect_ratio(struct vframe_s *vf, unsigned int pixel_ratio)
+@@ -306,6 +293,94 @@ static void set_aspect_ratio(struct vframe_s *vf, unsigned int pixel_ratio)
+ 	/*vf->ratio_control |= DISP_RATIO_FORCECONFIG | DISP_RATIO_KEEPRATIO;*/
+ }
+ 
++static int ge2d_canvas_dup(struct canvas_s *srcy, struct canvas_s *srcu,
++		struct canvas_s *des, int format, u32 srcindex, u32 desindex)
++{
++
++	struct config_para_ex_s ge2d_config;
++
++	memset(&ge2d_config, 0, sizeof(struct config_para_ex_s));
++
++	ge2d_config.alu_const_color = 0;
++	ge2d_config.bitmask_en = 0;
++	ge2d_config.src1_gb_alpha = 0;
++
++	ge2d_config.src_planes[0].addr = srcy->addr;
++	ge2d_config.src_planes[0].w = srcy->width;
++	ge2d_config.src_planes[0].h = srcy->height;
++
++	ge2d_config.src_planes[1].addr = srcu->addr;
++	ge2d_config.src_planes[1].w = srcu->width;
++	ge2d_config.src_planes[1].h = srcu->height;
++
++	ge2d_config.dst_planes[0].addr = des->addr;
++	ge2d_config.dst_planes[0].w = des->width;
++	ge2d_config.dst_planes[0].h = des->height;
++
++	ge2d_config.src_para.canvas_index = srcindex;
++	ge2d_config.src_para.mem_type = CANVAS_TYPE_INVALID;
++	ge2d_config.src_para.format = format;
++	ge2d_config.src_para.fill_color_en = 0;
++	ge2d_config.src_para.fill_mode = 0;
++	ge2d_config.src_para.color = 0;
++	ge2d_config.src_para.top = 0;
++	ge2d_config.src_para.left = 0;
++	ge2d_config.src_para.width = srcy->width;
++	ge2d_config.src_para.height = srcy->height;
++
++	ge2d_config.dst_para.canvas_index = desindex;
++	ge2d_config.dst_para.mem_type = CANVAS_TYPE_INVALID;
++	ge2d_config.dst_para.format = format;
++	ge2d_config.dst_para.fill_color_en = 0;
++	ge2d_config.dst_para.fill_mode = 0;
++	ge2d_config.dst_para.color = 0;
++	ge2d_config.dst_para.top = 0;
++	ge2d_config.dst_para.left = 0;
++	ge2d_config.dst_para.width = srcy->width;
++	ge2d_config.dst_para.height = srcy->height;
++
++	if (ge2d_context_config_ex(ge2d_vc1_context, &ge2d_config) < 0) {
++		pr_info("ge2d_context_config_ex failed\n");
++		return -1;
++	}
++
++	stretchblt_noalpha(ge2d_vc1_context, 0, 0, srcy->width,
++			srcy->height, 0, 0, srcy->width, srcy->height);
++
++	return 0;
++}
++
++static u32 vc1_copy_canvas(u32 src_index)
++{
++	struct canvas_s csy, csu, cdy;
++	u32 src_canvas, dst_canvas;
++	u32 dst_index, i;
++
++	for (i = 0; i < COPY_DECODE_BUFFER_NUM_MAX; i++) {
++		dst_index = i + DECODE_BUFFER_NUM_MAX;
++		if (!vfbuf_use[dst_index]) {
++			break;
++		}
++	}
++
++	if (i == COPY_DECODE_BUFFER_NUM_MAX) {
++		pr_err("vc1: shouldn't happen, but couldn't find a free vbuf!\n");
++		return 0;
++	}
++
++	src_canvas = index2canvas(src_index);
++	dst_canvas = index2canvas(dst_index);
++
++	canvas_read(src_canvas & 0xff, &csy);
++	canvas_read((src_canvas >> 8) & 0xff, &csu);
++
++	canvas_read(dst_canvas & 0xff, &cdy);
++
++	ge2d_canvas_dup(&csy, &csu, &cdy, GE2D_FORMAT_M24_NV21, src_canvas & 0xffff, dst_canvas & 0xffff);
++
++	return dst_index;
++}
++
+ static void vc1_set_rp(void) {
+ 	unsigned long flags;
+ 
+@@ -376,11 +451,14 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
+ 			return IRQ_HANDLED;
+ 		}
+ 
+-		if ((intra_output == 0) && (picture_type != 0)) {
++		if ((intra_output == 0) && (picture_type != I_PICTURE)) {
++			/* skip non-I frames at start of playback */
+ 			WRITE_VREG(VC1_BUFFERIN, ~(1 << buffer_index));
+ 			WRITE_VREG(VC1_BUFFEROUT, 0);
+ 			WRITE_VREG(ASSIST_MBOX1_CLR_REG, 1);
+ 
++			gvs->drop_frame_count++;
++
+ 			return IRQ_HANDLED;
+ 		}
+ 
+@@ -466,7 +544,7 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
+ 		if (vvc1_amstream_dec_info.rate == 0)
+ 			vvc1_amstream_dec_info.rate = PTS2DUR(frm.rate);
+ 
+-		if (reg & INTERLACE_FLAG) {	/* interlace */
++		if ((reg & INTERLACE_FLAG) && ! force_frameint) {	/* field interlace */
+ 			if (kfifo_get(&newframe_q, &vf) == 0) {
+ 				pr_info
+ 				("fatal error, no available buffer slot.");
+@@ -599,8 +677,8 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
+ 			}
+ 
+ 			vf->duration_pulldown = 0;
+-			vf->type = (reg & BOTTOM_FIELD_FIRST_FLAG) ?
+-			VIDTYPE_INTERLACE_TOP : VIDTYPE_INTERLACE_BOTTOM;
++			vf->type = !(reg & BOTTOM_FIELD_FIRST_FLAG) ?
++			VIDTYPE_INTERLACE_BOTTOM : VIDTYPE_INTERLACE_TOP;
+ #ifdef NV21
+ 			vf->type |= VIDTYPE_VIU_NV21;
+ #endif
+@@ -622,7 +700,7 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
+ 					PROVIDER_NAME,
+ 					VFRAME_EVENT_PROVIDER_VFRAME_READY,
+ 					NULL);
+-		} else {	/* progressive */
++		} else {	/* progressive or frame interlace */
+ 			if (kfifo_get(&newframe_q, &vf) == 0) {
+ 				pr_info
+ 				("fatal error, no available buffer slot.");
+@@ -718,6 +796,8 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
+ 					VFRAME_EVENT_PROVIDER_VFRAME_READY,
+ 					NULL);
+ 		}
++		frame_width = vvc1_amstream_dec_info.width;
++		frame_height = vvc1_amstream_dec_info.height;
+ 		frame_dur = vvc1_amstream_dec_info.rate;
+ 		total_frame++;
+ 
+@@ -728,6 +808,7 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
+ 		/* pr_info("PicType = %d, PTS = 0x%x, repeat
+ 		 *count %d\n", picture_type, vf->pts, repeat_count);
+ 		 */
++
+ 		WRITE_VREG(VC1_BUFFEROUT, 0);
+ 	}
+ 
+@@ -750,16 +831,28 @@ static struct vframe_s *vvc1_vf_get(void *op_arg)
+ {
+ 	struct vframe_s *vf;
+ 
+-	if (kfifo_get(&display_q, &vf))
++	if (kfifo_get(&display_q, &vf)) {
++		u32 buffer_index = vc1_copy_canvas(vf->index);
++
++		vfbuf_use[buffer_index]++;
++
++		if (--vfbuf_use[vf->index] == 0) {
++			WRITE_VREG(VC1_BUFFERIN, ~(1 << vf->index));
++		}
++
++		vf->canvas0Addr = vf->canvas1Addr = index2canvas(buffer_index);
++		vf->mem_handle = decoder_bmmu_box_get_mem_handle(mm_blk_handle, buffer_index);
++		vf->index = buffer_index;
++
+ 		return vf;
++	}
+ 
+ 	return NULL;
+ }
+ 
+ static void vvc1_vf_put(struct vframe_s *vf, void *op_arg)
+ {
+-	if (pool_index(vf) == cur_pool_idx)
+-		kfifo_put(&recycle_q, (const struct vframe_s *)vf);
++	kfifo_put(&recycle_q, (const struct vframe_s *)vf);
+ }
+ 
+ static int vvc1_vf_states(struct vframe_states *states, void *op_arg)
+@@ -819,7 +912,7 @@ int vvc1_dec_status(struct vdec_s *vdec, struct vdec_info *vstatus)
+ 		vstatus->frame_rate = 96000 / vvc1_amstream_dec_info.rate;
+ 	else
+ 		vstatus->frame_rate = -1;
+-	vstatus->error_count = READ_VREG(AV_SCRATCH_6);
++	vstatus->error_count = READ_VREG(VC1_ERROR_COUNT);
+ 	vstatus->status = stat;
+ 	vstatus->bit_rate = gvs->bit_rate;
+ 	vstatus->frame_dur = vvc1_amstream_dec_info.rate;
+@@ -873,14 +966,6 @@ static int vvc1_canvas_init(void)
+ 		/* HD & SD */
+ 		canvas_width = 1920;
+ 		canvas_height = 1088;
+-		if (vvc1_amstream_dec_info.width < vvc1_amstream_dec_info.height) {
+-			canvas_width = 1088;
+-			canvas_height = 1920;
+-			if (vvc1_amstream_dec_info.width > 1088) {
+-				canvas_width = ALIGN(vvc1_amstream_dec_info.width, 64);
+-				canvas_height = ALIGN(vvc1_amstream_dec_info.height, 64);
+-			}
+-		}
+ 		decbuf_y_size = 0x200000;
+ 		decbuf_uv_size = 0x80000;
+ 		decbuf_size = 0x300000;
+@@ -903,11 +988,11 @@ static int vvc1_canvas_init(void)
+ 		}
+ 
+ #ifdef NV21
+-		canvas_config(2 * i + 0,
++		canvas_config(2 * i + 0 + CANVAS_INDEX_START,
+ 			buf_start,
+ 			canvas_width, canvas_height,
+ 			CANVAS_ADDR_NOWRAP, CANVAS_BLKMODE_32X32);
+-		canvas_config(2 * i + 1,
++		canvas_config(2 * i + 1 + CANVAS_INDEX_START,
+ 			buf_start +
+ 			decbuf_y_size, canvas_width,
+ 			canvas_height / 2, CANVAS_ADDR_NOWRAP,
+@@ -966,10 +1051,10 @@ static int vvc1_prot_init(void)
+ 
+ 	/* index v << 16 | u << 8 | y */
+ #ifdef NV21
+-	WRITE_VREG(AV_SCRATCH_0, 0x010100);
+-	WRITE_VREG(AV_SCRATCH_1, 0x030302);
+-	WRITE_VREG(AV_SCRATCH_2, 0x050504);
+-	WRITE_VREG(AV_SCRATCH_3, 0x070706);
++	WRITE_VREG(AV_SCRATCH_0, index2canvas(0));
++	WRITE_VREG(AV_SCRATCH_1, index2canvas(1));
++	WRITE_VREG(AV_SCRATCH_2, index2canvas(2));
++	WRITE_VREG(AV_SCRATCH_3, index2canvas(3));
+ /*	WRITE_VREG(AV_SCRATCH_G, 0x090908);
+ 	WRITE_VREG(AV_SCRATCH_H, 0x0b0b0a);
+ 	WRITE_VREG(AV_SCRATCH_I, 0x0d0d0c);
+@@ -1037,23 +1122,18 @@ static void vvc1_local_init(bool is_reset)
+ 	memset(&frm, 0, sizeof(frm));
+ 
+ 	if (!is_reset) {
+-		for (i = 0; i < DECODE_BUFFER_NUM_MAX; i++)
++		for (i = 0; i < DECODE_BUFFER_NUM_MAX + COPY_DECODE_BUFFER_NUM_MAX; i++)
+ 			vfbuf_use[i] = 0;
+ 
+ 		INIT_KFIFO(display_q);
+ 		INIT_KFIFO(recycle_q);
+ 		INIT_KFIFO(newframe_q);
+-		cur_pool_idx ^= 1;
+ 		for (i = 0; i < VF_POOL_SIZE; i++) {
+ 			const struct vframe_s *vf;
+ 
+-			if (cur_pool_idx == 0) {
+-				vf = &vfpool[i];
+-				vfpool[i].index = DECODE_BUFFER_NUM_MAX;
+-			} else {
+-				vf = &vfpool2[i];
+-				vfpool2[i].index = DECODE_BUFFER_NUM_MAX;
+-			}
++			vf = &vfpool[i];
++			vfpool[i].index = DECODE_BUFFER_NUM_MAX;
++
+ 			kfifo_put(&newframe_q, (const struct vframe_s *)vf);
+ 		}
+ 	}
+@@ -1126,13 +1206,10 @@ static void vvc1_put_timer_func(unsigned long arg)
+ 		struct vframe_s *vf;
+ 
+ 		if (kfifo_get(&recycle_q, &vf)) {
+-			if ((vf->index < DECODE_BUFFER_NUM_MAX) &&
+-				(--vfbuf_use[vf->index] == 0)) {
+-				WRITE_VREG(VC1_BUFFERIN, ~(1 << vf->index));
++			if ((vf->index < DECODE_BUFFER_NUM_MAX + COPY_DECODE_BUFFER_NUM_MAX) && (--vfbuf_use[vf->index] == 0)) {
+ 				vf->index = DECODE_BUFFER_NUM_MAX;
+ 			}
+-		if (pool_index(vf) == cur_pool_idx)
+-			kfifo_put(&newframe_q, (const struct vframe_s *)vf);
++			kfifo_put(&newframe_q, (const struct vframe_s* )vf);
+ 		}
+ 	}
+ 
+@@ -1384,6 +1461,14 @@ static int __init amvdec_vc1_driver_init_module(void)
+ {
+ 	pr_debug("amvdec_vc1 module init\n");
+ 
++	if (ge2d_vc1_context == NULL)
++		ge2d_vc1_context = create_ge2d_work_queue();
++
++	if (ge2d_vc1_context == NULL) {
++		pr_info("create_ge2d_work_queue failed\n");
++		return -ENODEV;
++	}
++
+ 	if (platform_driver_register(&amvdec_vc1_driver)) {
+ 		pr_err("failed to register amvdec_vc1 driver\n");
+ 		return -ENODEV;
+@@ -1398,6 +1483,11 @@ static void __exit amvdec_vc1_driver_remove_module(void)
+ 	pr_debug("amvdec_vc1 module remove.\n");
+ 
+ 	platform_driver_unregister(&amvdec_vc1_driver);
++
++	if (ge2d_vc1_context) {
++		destroy_ge2d_work_queue(ge2d_vc1_context);
++		ge2d_vc1_context = NULL;
++	}
+ }
+ module_param(unstable_pts_debug, uint, 0664);
+ MODULE_PARM_DESC(unstable_pts_debug, "\n amvdec_vc1 unstable_pts\n");
+@@ -1406,6 +1496,9 @@ MODULE_PARM_DESC(unstable_pts_debug, "\n amvdec_vc1 unstable_pts\n");
+ module_init(amvdec_vc1_driver_init_module);
+ module_exit(amvdec_vc1_driver_remove_module);
+ 
++MODULE_PARM_DESC(force_frameint, "\nframe interlace");
++module_param(force_frameint, int, 0664);
++
+ MODULE_DESCRIPTION("AMLOGIC VC1 Video Decoder Driver");
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Qi Wang <qi.wang@amlogic.com>");
+-- 
+2.48.1
+
+
+From 780f3cce992a2afa5ea6c8fa681c19c571a09daf Mon Sep 17 00:00:00 2001
+From: cpm <162544069+cpm-code@users.noreply.github.com>
+Date: Sun, 16 Mar 2025 15:31:42 +0800
+Subject: [PATCH 8/8] vvc1: modifiy debug info
+
+---
+ drivers/frame_provider/decoder/vc1/vvc1.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/frame_provider/decoder/vc1/vvc1.c b/drivers/frame_provider/decoder/vc1/vvc1.c
+index e60f04ac..8261c7a4 100644
+--- a/drivers/frame_provider/decoder/vc1/vvc1.c
++++ b/drivers/frame_provider/decoder/vc1/vvc1.c
+@@ -486,7 +486,7 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
+ 					frm.end_pts = pts;
+ 					frm.rate = (frm.end_pts -
+ 						frm.start_pts) / frm.num;
+-					pr_info("frate before=%d,%d,num=%d\n",
++					pr_debug("frate before=%d,%d,num=%d\n",
+ 					frm.rate,
+ 					DUR2PTS(vvc1_amstream_dec_info.rate),
+ 					frm.num);
+@@ -510,7 +510,7 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
+ 						vvc1_amstream_dec_info.rate),
+ 						RATE_30_FPS,
+ 						RATE_CORRECTION_THRESHOLD))) {
+-						pr_info(
++						pr_debug(
+ 						"vvc1: frate from %d to %d\n",
+ 						vvc1_amstream_dec_info.rate,
+ 						PTS2DUR(frm.rate));
+-- 
+2.48.1
+
