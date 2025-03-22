@@ -1,7 +1,7 @@
-From 33d048e7f9981201707dccfba9724824c7cbceba Mon Sep 17 00:00:00 2001
+From f423c5c1b64fc69fad60968cfb818f22ddea1361 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 01:52:47 +0200
-Subject: [PATCH 08/17] Revert "alsa: mark surround71 also as device type hdmi"
+Subject: [PATCH 08/18] Revert "alsa: mark surround71 also as device type hdmi"
 
 This reverts commit 31f6f17ae2f063d53c59f5ed7138e103441be9ff.
 ---

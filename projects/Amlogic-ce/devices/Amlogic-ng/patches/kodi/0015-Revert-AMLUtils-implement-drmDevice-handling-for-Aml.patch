@@ -1,7 +1,7 @@
-From 6ca782e4223883dc2f074766a9cddaf727ffb534 Mon Sep 17 00:00:00 2001
+From 254596f57ed2b4341ad031d221a630474962ee94 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 02:06:23 +0200
-Subject: [PATCH 15/17] Revert "AMLUtils: implement drmDevice handling for
+Subject: [PATCH 15/18] Revert "AMLUtils: implement drmDevice handling for
  Amlogic 5.4 kernel"
 
 This reverts commit 48fd586e41eab7fa91141552f792e5570005b8de.
@@ -91,7 +91,7 @@ index 2f02477700..b9624f84c3 100644
    ShowMainVideo(false);
  
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 74e67b007d..995296197b 100644
+index 7aec21f379..e3edad63aa 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -57,30 +57,6 @@ int aml_get_cpufamily_id()
@@ -154,7 +154,7 @@ index 74e67b007d..995296197b 100644
  bool aml_display_support_3d()
  {
    static int support_3d = -1;
-@@ -358,6 +356,20 @@ void aml_probe_hdmi_audio()
+@@ -364,6 +362,20 @@ void aml_probe_hdmi_audio()
    }
  }
  
@@ -175,7 +175,7 @@ index 74e67b007d..995296197b 100644
  bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
  {
    if (!res)
-@@ -377,7 +389,16 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+@@ -383,7 +395,16 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
    if (StringUtils::EndsWith(fromMode, "*"))
      fromMode.erase(fromMode.size() - 1);
  
@@ -193,7 +193,7 @@ index 74e67b007d..995296197b 100644
    {
      res->iWidth = nativeGui ? 4096 : 1920;
      res->iHeight= nativeGui ? 2160 : 1080;
-@@ -472,347 +493,12 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+@@ -478,347 +499,12 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
    return res->iWidth > 0 && res->iHeight> 0;
  }
  
@@ -545,7 +545,7 @@ index 74e67b007d..995296197b 100644
    bool result = aml_mode_to_resolution(mode.c_str(), res);
  
    if (aml_has_frac_rate_policy())
-@@ -851,6 +537,9 @@ bool aml_set_native_resolution(const RESOLUTION_INFO &res, std::string framebuff
+@@ -857,6 +543,9 @@ bool aml_set_native_resolution(const RESOLUTION_INFO &res, std::string framebuff
        aml_handle_display_stereo_mode(stereo_mode);
    }
  
@@ -555,7 +555,7 @@ index 74e67b007d..995296197b 100644
    return result;
  }
  
-@@ -862,7 +551,11 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
+@@ -868,7 +557,11 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
  
    if (!user_dcapfile.Exists())
    {
@@ -568,7 +568,7 @@ index 74e67b007d..995296197b 100644
  
      CSysfsPath vesa{"/flash/vesa.enable"};
      if (vesa.Exists())
-@@ -965,7 +658,9 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
+@@ -971,7 +664,9 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
    else
      CLog::Log(LOGDEBUG, "{}: try to set mode: {}", __FUNCTION__, mode.c_str());
  
@@ -579,7 +579,7 @@ index 74e67b007d..995296197b 100644
  
    CSysfsPath amhdmitx0_custom_mode{"/sys/class/amhdmitx/amhdmitx0/custom_mode"};
    if (amhdmitx0_custom_mode.Exists())
-@@ -986,17 +681,33 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
+@@ -992,17 +687,33 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
  
      if ((cur_fractional_rate != fractional_rate) || force_mode_switch)
      {
@@ -615,7 +615,7 @@ index 74e67b007d..995296197b 100644
  void aml_handle_display_stereo_mode(const int stereo_mode)
  {
    static int kernel_stereo_mode = -1;
-@@ -1033,6 +744,31 @@ void aml_handle_display_stereo_mode(const int stereo_mode)
+@@ -1039,6 +750,31 @@ void aml_handle_display_stereo_mode(const int stereo_mode)
    }
  }
  
@@ -648,7 +648,7 @@ index 74e67b007d..995296197b 100644
  {
    int fd0;
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index ddb15ea8b4..dcacb18f8d 100644
+index c7ef439099..da6069a2fe 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
 @@ -8,9 +8,6 @@
@@ -671,7 +671,7 @@ index ddb15ea8b4..dcacb18f8d 100644
  bool aml_display_support_3d();
  bool aml_support_hevc();
  bool aml_support_hevc_4k2k();
-@@ -87,7 +84,10 @@ bool aml_get_native_resolution(RESOLUTION_INFO *res);
+@@ -88,7 +85,10 @@ bool aml_get_native_resolution(RESOLUTION_INFO *res);
  bool aml_set_native_resolution(const RESOLUTION_INFO &res, std::string framebuffer_name, const int stereo_mode, bool force_mode_switch);
  bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions);
  bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuffer_name, bool force_mode_switch);

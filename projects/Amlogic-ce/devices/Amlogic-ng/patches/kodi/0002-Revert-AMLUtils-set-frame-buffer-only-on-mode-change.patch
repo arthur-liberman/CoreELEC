@@ -1,7 +1,7 @@
-From 3c4f4af83fc5226024d11472a83c3eb2c91d96a5 Mon Sep 17 00:00:00 2001
+From bdbc97d05fc69b0feac34c8b05dabf410cb3ee35 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 01:51:48 +0200
-Subject: [PATCH 02/17] Revert "AMLUtils: set frame buffer only on mode change"
+Subject: [PATCH 02/18] Revert "AMLUtils: set frame buffer only on mode change"
 
 This reverts commit d85b356f623720f87db3dead1863ab57e7dff9ca.
 ---
@@ -11,10 +11,10 @@ This reverts commit d85b356f623720f87db3dead1863ab57e7dff9ca.
  3 files changed, 35 insertions(+), 33 deletions(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index fe34075a85..0b13096551 100644
+index 8e97582102..3790ac0060 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -1244,33 +1244,8 @@ bool aml_set_hotplug_mode(std::string mode)
+@@ -1250,33 +1250,8 @@ bool aml_set_hotplug_mode(std::string mode)
    return ret;
  }
  
@@ -50,7 +50,7 @@ index fe34075a85..0b13096551 100644
  {
    std::string current_mode = aml_get_drmDevice_mode();
    bool ret = false;
-@@ -1346,14 +1321,9 @@ bool aml_set_drmDevice_mode(const RESOLUTION_INFO &res, std::string mode,
+@@ -1352,14 +1327,9 @@ bool aml_set_drmDevice_mode(const RESOLUTION_INFO &res, std::string mode,
        CLog::Log(LOGDEBUG, "AMLUtils::{} - found mode in connector mode list: [{:d}]:{}", __FUNCTION__, i, mode);
        drmModeFBPtr drm_fb = drmModeGetFB(fd, crtc->buffer_id);
  
@@ -65,7 +65,7 @@ index fe34075a85..0b13096551 100644
        if (force_mode_switch)
          set_drmProp(fd, connector->connector_id, "UPDATE", DRM_MODE_OBJECT_CONNECTOR, 1, NULL);
  
-@@ -1517,7 +1487,9 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
+@@ -1523,7 +1493,9 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
    if (aml_get_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR) != fractional_rate)
      aml_set_drmProperty("FRAC_RATE_POLICY", DRM_MODE_OBJECT_CONNECTOR, fractional_rate);
  
@@ -76,7 +76,7 @@ index fe34075a85..0b13096551 100644
  
    return true;
  }
-@@ -1558,6 +1530,31 @@ void aml_handle_display_stereo_mode(const int stereo_mode)
+@@ -1564,6 +1536,31 @@ void aml_handle_display_stereo_mode(const int stereo_mode)
    }
  }
  
@@ -109,10 +109,10 @@ index fe34075a85..0b13096551 100644
  {
    // 4.9 seg faults on access to /sys/kernel/debug/aml_reg/paddr and since we are CE it's always AML
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index b70d992ad0..cdbd84c7e0 100644
+index eed8317f18..38d0a28831 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
-@@ -89,6 +89,8 @@ bool aml_set_native_resolution(const RESOLUTION_INFO &res, std::string framebuff
+@@ -90,6 +90,8 @@ bool aml_set_native_resolution(const RESOLUTION_INFO &res, std::string framebuff
  bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions);
  bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuffer_name, bool force_mode_switch);
  void aml_handle_display_stereo_mode(const int stereo_mode);

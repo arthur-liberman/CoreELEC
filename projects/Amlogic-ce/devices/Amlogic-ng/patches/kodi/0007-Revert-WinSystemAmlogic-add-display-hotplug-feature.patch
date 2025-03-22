@@ -1,7 +1,7 @@
-From fc644e7761308c6226dd05745012fa544ac49289 Mon Sep 17 00:00:00 2001
+From 2881a29f3621bc27c37dac22fce74ffcaa054219 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 01:52:43 +0200
-Subject: [PATCH 07/17] Revert "WinSystemAmlogic: add display hotplug feature"
+Subject: [PATCH 07/18] Revert "WinSystemAmlogic: add display hotplug feature"
 
 This reverts commit 6711717121964354cac3fbbd0fae91471db548f7.
 ---
@@ -26,10 +26,10 @@ index 5a77d53914..d96fa913ae 100644
      std::ofstream ofs(aml_res_path + "/" + aml_res_file, std::ofstream::out);
      ofs << "# WARNING DO NOT MODIFY THIS FILE! ALL CHANGES WILL BE LOST!\n";
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 92493e1f2e..f4beec321a 100644
+index 6f3fdcd883..772dc741dc 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -421,13 +421,6 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
+@@ -427,13 +427,6 @@ bool aml_mode_to_resolution(const char *mode, RESOLUTION_INFO *res)
        height = 2160;
        *smode = 'p';
      }
@@ -43,7 +43,7 @@ index 92493e1f2e..f4beec321a 100644
      else
      {
        return false;
-@@ -528,7 +521,7 @@ drmModeResPtr aml_get_drmDevice_resources(int fd)
+@@ -534,7 +527,7 @@ drmModeResPtr aml_get_drmDevice_resources(int fd)
  }
  
  // get connector of drmDevice
@@ -52,7 +52,7 @@ index 92493e1f2e..f4beec321a 100644
  {
    drmModeConnectorPtr connector = NULL;
  
-@@ -547,12 +540,13 @@ drmModeConnectorPtr aml_get_drmDevice_connector(int fd, drmModeResPtr resources,
+@@ -553,12 +546,13 @@ drmModeConnectorPtr aml_get_drmDevice_connector(int fd, drmModeResPtr resources,
      if (connector == NULL)
        continue;
  
@@ -71,7 +71,7 @@ index 92493e1f2e..f4beec321a 100644
    }
  
    return connector;
-@@ -612,47 +606,6 @@ drmModeCrtcPtr aml_get_drmDevice_crtc(int fd, drmModeResPtr resources, drmModeEn
+@@ -618,47 +612,6 @@ drmModeCrtcPtr aml_get_drmDevice_crtc(int fd, drmModeResPtr resources, drmModeEn
    return crtc;
  }
  
@@ -119,7 +119,7 @@ index 92493e1f2e..f4beec321a 100644
  // get all modes of current connected device
  std::string aml_get_drmDevice_modes(void)
  {
-@@ -675,7 +628,7 @@ std::string aml_get_drmDevice_modes(void)
+@@ -681,7 +634,7 @@ std::string aml_get_drmDevice_modes(void)
      return modes;
    }
  
@@ -128,7 +128,7 @@ index 92493e1f2e..f4beec321a 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -734,10 +687,9 @@ int get_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_type
+@@ -740,10 +693,9 @@ int get_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_type
    return ret;
  }
  
@@ -140,7 +140,7 @@ index 92493e1f2e..f4beec321a 100644
    drmModeObjectPropertiesPtr props = NULL;
  
    props = drmModeObjectGetProperties(fd, id, obj_type);
-@@ -756,16 +708,8 @@ void set_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_typ
+@@ -762,16 +714,8 @@ void set_drmProp(int fd, unsigned int id, std::string name, unsigned int obj_typ
  
      if (StringUtils::EqualsNoCase(prop->name, name))
      {
@@ -159,7 +159,7 @@ index 92493e1f2e..f4beec321a 100644
  
        CLog::Log(LOGDEBUG, "AMLUtils::{} - set property '{}', value: {:d}", __FUNCTION__, prop->name, value);
        drmModeFreeProperty(prop);
-@@ -787,7 +731,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+@@ -793,7 +737,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
    drmModeEncoderPtr encoder = NULL;
    drmModeCrtcPtr crtc = NULL;
    unsigned int id;
@@ -167,7 +167,7 @@ index 92493e1f2e..f4beec321a 100644
  
    if (fd < 0)
    {
-@@ -803,7 +746,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+@@ -809,7 +752,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
      return;
    }
  
@@ -176,7 +176,7 @@ index 92493e1f2e..f4beec321a 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -812,15 +755,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+@@ -818,15 +761,6 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
      return;
    }
  
@@ -192,7 +192,7 @@ index 92493e1f2e..f4beec321a 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -856,7 +790,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
+@@ -862,7 +796,7 @@ void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int v
        return;
    }
  
@@ -201,7 +201,7 @@ index 92493e1f2e..f4beec321a 100644
  
    drmModeFreeResources(resources);
    drmModeFreeConnector(connector);
-@@ -875,7 +809,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+@@ -881,7 +815,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
    drmModeEncoderPtr encoder = NULL;
    drmModeCrtcPtr crtc = NULL;
    unsigned int id;
@@ -209,7 +209,7 @@ index 92493e1f2e..f4beec321a 100644
  
    if (fd < 0)
    {
-@@ -891,7 +824,7 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+@@ -897,7 +830,7 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
      return ret;
    }
  
@@ -218,7 +218,7 @@ index 92493e1f2e..f4beec321a 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -900,23 +833,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
+@@ -906,23 +839,6 @@ int aml_get_drmProperty(std::string name, unsigned int obj_type)
      return ret;
    }
  
@@ -242,7 +242,7 @@ index 92493e1f2e..f4beec321a 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -972,8 +888,6 @@ std::string aml_get_drmDevice_mode(void)
+@@ -978,8 +894,6 @@ std::string aml_get_drmDevice_mode(void)
    drmModeEncoderPtr encoder = NULL;
    drmModeCrtcPtr crtc = NULL;
    std::string mode = "";
@@ -251,7 +251,7 @@ index 92493e1f2e..f4beec321a 100644
  
    if (fd < 0)
    {
-@@ -989,7 +903,7 @@ std::string aml_get_drmDevice_mode(void)
+@@ -995,7 +909,7 @@ std::string aml_get_drmDevice_mode(void)
      return mode;
    }
  
@@ -260,7 +260,7 @@ index 92493e1f2e..f4beec321a 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -998,16 +912,6 @@ std::string aml_get_drmDevice_mode(void)
+@@ -1004,16 +918,6 @@ std::string aml_get_drmDevice_mode(void)
      return mode;
    }
  
@@ -277,7 +277,7 @@ index 92493e1f2e..f4beec321a 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -1042,191 +946,6 @@ std::string aml_get_drmDevice_mode(void)
+@@ -1048,191 +952,6 @@ std::string aml_get_drmDevice_mode(void)
    return mode;
  }
  
@@ -469,7 +469,7 @@ index 92493e1f2e..f4beec321a 100644
  bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string mode,
    bool force_mode_switch)
  {
-@@ -1238,7 +957,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+@@ -1244,7 +963,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
    drmModeConnectorPtr connector = NULL;
    drmModeEncoderPtr encoder = NULL;
    drmModeCrtcPtr crtc = NULL;
@@ -477,7 +477,7 @@ index 92493e1f2e..f4beec321a 100644
  
    CLog::Log(LOGDEBUG, "AMLUtils::{} - current mode: {}, new mode: {}", __FUNCTION__,
      current_mode, mode);
-@@ -1257,7 +975,7 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+@@ -1263,7 +981,7 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
      return ret;
    }
  
@@ -486,7 +486,7 @@ index 92493e1f2e..f4beec321a 100644
    if (!connector)
    {
      CLog::Log(LOGERROR, "AMLUtils::{} - failed to get connector of drmDevice", __FUNCTION__);
-@@ -1266,16 +984,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
+@@ -1272,16 +990,6 @@ bool aml_set_drmDevice_mode(unsigned int width, unsigned int height, std::string
      return ret;
    }
  
@@ -503,7 +503,7 @@ index 92493e1f2e..f4beec321a 100644
    encoder = aml_get_drmDevice_encoder(fd, resources, connector);
    if (!encoder)
    {
-@@ -1411,27 +1119,21 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
+@@ -1417,27 +1125,21 @@ bool aml_probe_resolutions(std::vector<RESOLUTION_INFO> &resolutions)
      if (((StringUtils::StartsWith(i->c_str(), "4k2k")) && (aml_support_h264_4k2k() > AML_NO_H264_4K2K)) || !(StringUtils::StartsWith(i->c_str(), "4k2k")))
      {
        if (aml_mode_to_resolution(i->c_str(), &res))
@@ -545,10 +545,10 @@ index 92493e1f2e..f4beec321a 100644
        }
      }
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index 393b56957e..91534d9402 100644
+index 896763f4cf..3c1bebe356 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
-@@ -95,7 +95,3 @@ bool aml_unset_reg_ignore_alpha();
+@@ -96,7 +96,3 @@ bool aml_unset_reg_ignore_alpha();
  
  void aml_set_drmProperty(std::string name, unsigned int obj_type, unsigned int value);
  int aml_get_drmProperty(std::string name, unsigned int obj_type);

@@ -1,7 +1,7 @@
-From 87cfdc328413f7afb7a1a12380353a25a293e6d7 Mon Sep 17 00:00:00 2001
+From 9bad291a09b62920c5866b3387c16833fb9fb516 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 02:00:37 +0200
-Subject: [PATCH 14/17] Revert "AMLUtils: change framebuffer resolution to
+Subject: [PATCH 14/18] Revert "AMLUtils: change framebuffer resolution to
  enforce DRM mode change"
 
 This reverts commit 531f44c129e43895702dac491344539119b69f08.
@@ -10,10 +10,10 @@ This reverts commit 531f44c129e43895702dac491344539119b69f08.
  1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 10df4fbb7a..74e67b007d 100644
+index d919e85cf3..7aec21f379 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -991,9 +991,8 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
+@@ -997,9 +997,8 @@ bool aml_set_display_resolution(const RESOLUTION_INFO &res, std::string framebuf
      }
    }
  

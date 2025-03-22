@@ -1,7 +1,7 @@
-From ce2a805977eab110c2e2d0834b2fda35c93fbc95 Mon Sep 17 00:00:00 2001
+From cec80c14019b9f2a09ebd3573c79713ed04e0903 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Thu, 9 Jan 2025 16:12:04 +0200
-Subject: [PATCH 17/17] libdovi: set libdovi mode to lossless
+Subject: [PATCH 17/18] libdovi: set libdovi mode to lossless
 
 ---
  system/settings/settings.xml | 2 +-

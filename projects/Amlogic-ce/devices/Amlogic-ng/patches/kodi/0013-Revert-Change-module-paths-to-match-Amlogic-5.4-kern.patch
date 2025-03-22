@@ -1,7 +1,7 @@
-From ebcca7a85e99fbd6142b0dbf6b9c89088ac06417 Mon Sep 17 00:00:00 2001
+From 63f967faa1d4ff6f6ee5725298095ed28e15ff18 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 02:00:33 +0200
-Subject: [PATCH 13/17] Revert "Change module paths to match Amlogic 5.4
+Subject: [PATCH 13/18] Revert "Change module paths to match Amlogic 5.4
  kernel"
 
 This reverts commit a3a87c52de5b0830ab71c0fe7b95bf5b0658af99.
@@ -66,10 +66,10 @@ index 8bcdfa498e..2f02477700 100644
      dolby_vision_enable.Set('N');
    }
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index ed3f08a2ca..10df4fbb7a 100644
+index ab132affcd..d919e85cf3 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -289,7 +289,7 @@ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int vie
+@@ -295,7 +295,7 @@ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int vie
        CLog::Log(LOGERROR, "AMLUtils::{} - unable to set 3D video mode 0x%x", __FUNCTION__, mode);
      close(fd);
  

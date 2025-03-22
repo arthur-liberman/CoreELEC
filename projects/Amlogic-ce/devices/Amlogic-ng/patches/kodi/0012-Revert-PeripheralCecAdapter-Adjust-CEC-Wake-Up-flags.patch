@@ -1,7 +1,7 @@
-From 8ad58bf3ff8c538cfd23ceb0ea9791ef6f9ec9ed Mon Sep 17 00:00:00 2001
+From 4a6ca63756e3ca380fd24f55ea7f3edfc682249d Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 01:53:13 +0200
-Subject: [PATCH 12/17] Revert "PeripheralCecAdapter: Adjust CEC Wake Up flags
+Subject: [PATCH 12/18] Revert "PeripheralCecAdapter: Adjust CEC Wake Up flags
  for 5.4 kernel"
 
 This reverts commit cd2c378c29769b7f8be495e659956a178da68fd7.

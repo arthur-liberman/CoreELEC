@@ -1,7 +1,7 @@
-From f360ebe2be0866402580c78c97c369c4ac9fc9a1 Mon Sep 17 00:00:00 2001
+From 491d6ac01e8b8efddf7c3c64b3b29e919855a2b4 Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 01:52:22 +0200
-Subject: [PATCH 05/17] Revert "AMLCodec: add support for AVS2, AVS3 and H266
+Subject: [PATCH 05/18] Revert "AMLCodec: add support for AVS2, AVS3 and H266
  hardware decoder"
 
 This reverts commit 8ef4e4930c8038019151c4476dac571c2dee4de6.
@@ -114,7 +114,7 @@ index 5ee4121d7b..96fe3ce64f 100644
        CLog::Log(LOGDEBUG, "{}: Unknown hints.codec({:d})", __MODULE_NAME__, m_hints.codec);
        goto FAIL;
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index d5ed862ca0..92493e1f2e 100644
+index dacf63961f..6f3fdcd883 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
 @@ -175,16 +175,6 @@ bool aml_support_hevc_10bit()
@@ -162,7 +162,7 @@ index d5ed862ca0..92493e1f2e 100644
  {
    static int support_dv = -1;
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index dff67e93d7..393b56957e 100644
+index 53aaa3fdb3..896763f4cf 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
 @@ -73,12 +73,9 @@ bool aml_support_hevc();

@@ -1,7 +1,7 @@
-From 155d56330f3a8db173a4a385f19e1531a74c279e Mon Sep 17 00:00:00 2001
+From 2541f00bc10dc71bad4a55cbae608e931cf8aace Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 01:51:48 +0200
-Subject: [PATCH 03/17] Revert "AMLUtils: update set video mode for
+Subject: [PATCH 03/18] Revert "AMLUtils: update set video mode for
  framepackaging support"
 
 This reverts commit d182b119eda067e9a061cfbb6c528b4d778c0bec.
@@ -10,10 +10,10 @@ This reverts commit d182b119eda067e9a061cfbb6c528b4d778c0bec.
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index 0b13096551..fe2a32701f 100644
+index 3790ac0060..5e738a8825 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -301,7 +301,7 @@ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int vie
+@@ -307,7 +307,7 @@ void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int vie
        CLog::Log(LOGERROR, "AMLUtils::{} - unable to set 3D video mode 0x%x", __FUNCTION__, mode);
      close(fd);
  

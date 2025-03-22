@@ -1,7 +1,7 @@
-From c781b2884c9dde0aea49549caf1831123bb8fe8b Mon Sep 17 00:00:00 2001
+From 4691640e7deb4939a710fae1671d96c37e04fecb Mon Sep 17 00:00:00 2001
 From: Arthur Liberman <arthur_liberman@hotmail.com>
 Date: Sat, 15 Mar 2025 01:53:10 +0200
-Subject: [PATCH 09/17] Revert "alsa: drop obsolete
+Subject: [PATCH 09/18] Revert "alsa: drop obsolete
  'aml_set_audio_passthrough'"
 
 This reverts commit eb97f5c837e174b60b86c3d74405ce49400fa2f2.
@@ -24,11 +24,11 @@ index 3b0453bfce..e137df228e 100644
    }
  
 diff --git a/xbmc/utils/AMLUtils.cpp b/xbmc/utils/AMLUtils.cpp
-index f4beec321a..697ba6b7c6 100644
+index 772dc741dc..76058fda95 100644
 --- a/xbmc/utils/AMLUtils.cpp
 +++ b/xbmc/utils/AMLUtils.cpp
-@@ -275,6 +275,11 @@ bool aml_convert_to_dv_by_vs_engine(StreamHdrType hdrType)
-   return ((convert_to_dv && !!user_convert_to_dv && !!dv_user_enabled) == 1);
+@@ -281,6 +281,11 @@ bool aml_video_started()
+   return (StringUtils::EqualsNoCase(videostarted.Get<std::string>().value(), "0x1"));
  }
  
 +void aml_set_audio_passthrough(bool passthrough)
@@ -40,12 +40,12 @@ index f4beec321a..697ba6b7c6 100644
  {
    int fd;
 diff --git a/xbmc/utils/AMLUtils.h b/xbmc/utils/AMLUtils.h
-index 91534d9402..d369c70f7a 100644
+index 3c1bebe356..84e431ea45 100644
 --- a/xbmc/utils/AMLUtils.h
 +++ b/xbmc/utils/AMLUtils.h
-@@ -80,6 +80,7 @@ bool aml_support_dolby_vision();
- bool aml_dolby_vision_enabled();
+@@ -81,6 +81,7 @@ bool aml_dolby_vision_enabled();
  bool aml_convert_to_dv_by_vs_engine(StreamHdrType hdrType);
+ bool aml_video_started();
  bool aml_has_frac_rate_policy();
 +void aml_set_audio_passthrough(bool passthrough);
  void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int view_mode);

@@ -1,0 +1,27 @@
+From 809a1cf5d2a0602cef8c139fc7ac0d28deba2a7b Mon Sep 17 00:00:00 2001
+From: Arthur Liberman <arthur_liberman@hotmail.com>
+Date: Sat, 22 Mar 2025 22:38:49 +0200
+Subject: [PATCH 18/18] DVDVideoCodecAmlogic: Remove HDR10+ metadata when VS10
+ is active Because the VS10 engine cannot convert the dynamic HDR10+ into DV
+
+---
+ .../cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
+index 96fe3ce64f..0e90b76ec5 100644
+--- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecAmlogic.cpp
+@@ -304,6 +304,9 @@ bool CDVDVideoCodecAmlogic::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
+             m_hints.dovi.el_present_flag = false;
+             m_bitstream->SetConvertDovi(convertDovi);
+           }
++
++          if (aml_convert_to_dv_by_vs_engine(m_hints.hdrType) && m_hints.dovi.dv_profile == 0)
++            m_bitstream->SetRemoveHdr10Plus(true);
+         }
+       }
+ 
+-- 
+2.48.1
+
